@@ -64,7 +64,9 @@ jobs:
               elif isinstance(x,list):
                   for v in x: visit(v)
           visit(data)
+          print(json.dumps({"hosts":["admin-status"],"upstreams":["disabled" if data.get("admin",{}).get("disabled") else "enabled"]}))
           '
+          docker inspect coonto-corporate-alpha --format '{"hosts":["alpha-status"],"upstreams":["{{.State.Status}}"]}' 2>/dev/null || true
           REMOTE
           )"
           printf "fingerprint=%s\n" "$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}' | head -n1)" >> "$GITHUB_OUTPUT"
@@ -77,7 +79,7 @@ jobs:
               except ValueError: continue
               if not isinstance(item,dict) or 'hosts' not in item: continue
               for host in item['hosts']:
-                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status']:
                       dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
                       dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
                       parts.append(host+'='+dials)
