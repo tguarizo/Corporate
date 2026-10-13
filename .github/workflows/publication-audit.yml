@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       summary: ${{ steps.remote.outputs.summary }}
+      fingerprint: ${{ steps.remote.outputs.fingerprint }}
     steps:
       - name: Verify configured SSH prerequisites
         env:
@@ -66,6 +67,7 @@ jobs:
           '
           REMOTE
           )"
+          printf "fingerprint=%s\n" "$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}' | head -n1)" >> "$GITHUB_OUTPUT"
           export AUDIT_RESULT="$audit_result"
           python3 - <<'PYRESULT'
           import os,json,re
@@ -88,3 +90,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo 'Read-only audit completed; services unchanged.'
+  host_identity:
+    needs: audit
+    name: "SSH host identity: ${{ needs.audit.outputs.fingerprint }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Recorded identity of the VPS used for the read-only routing audit.'
