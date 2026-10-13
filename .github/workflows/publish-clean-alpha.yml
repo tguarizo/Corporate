@@ -48,7 +48,7 @@ jobs:
           set -euo pipefail
           git archive 06cdfd11108b7ae9433e71e6833ae111871449e9 > /tmp/alpha.tar
           gzip /tmp/alpha.tar
-      - name: Validate isolated publication and backup plan on VPS
+      - name: Publish Alpha with verified routing and rollback
         id: deploy
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -61,7 +61,7 @@ jobs:
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes /tmp/alpha.tar.gz "$destination:$remote_dir/source.tar.gz"
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes .github/scripts/publish-alpha.py "$destination:$remote_dir/publish.py"
           set +e
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "python3 '$remote_dir/publish.py' '$remote_dir/source.tar.gz' --preflight" > /tmp/publication-result 2>&1
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "python3 '$remote_dir/publish.py' '$remote_dir/source.tar.gz'" > /tmp/publication-result 2>&1
           publication_status=$?
           set -e
           if [ "$publication_status" = 0 ]; then
