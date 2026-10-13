@@ -1,0 +1,27 @@
+name: Public Alpha browser validation
+on:
+  push:
+    branches: [codex/alpha-publication-audit]
+    paths: [.github/workflows/public-alpha-browser.yml]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser driver in temporary directory
+        run: npm install --prefix /tmp/alpha-browser --no-audit --no-fund --ignore-scripts playwright@1.58.2
+      - name: Validate live branching, completion, reset and mobile layout over verified HTTPS
+        env:
+          NODE_PATH: /tmp/alpha-browser/node_modules
+        run: node .github/scripts/public-browser-smoke.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpha-publicada-mobile
+          path: /tmp/alpha-browser/alpha-publicada.png
+          retention-days: 7
