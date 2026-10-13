@@ -1,0 +1,33 @@
+name: Corporate Alpha smoke
+on:
+  push:
+    branches: [restart/corporate-alpha-v0.1]
+  pull_request:
+    branches: [develop]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and runtime health
+        run: |
+          node --check server.js
+          node server.js > /tmp/corporate-server.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" || true' EXIT
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:3000/api/health > /tmp/health.json && break
+            sleep 1
+          done
+          node -e "const a=require('/tmp/health.json'); if(a.status!=='ok'||a.service!=='coonto-corporate')process.exit(1)"
+      - name: Verify deployment boundaries
+        run: |
+          grep -q '127.0.0.1:3200:3000' compose.yaml
+          grep -q 'tu uvo' README.md && exit 1 || true
+          grep -q 'tuuvo.app.br' README.md
+          test -f docs/ALPHA_RESTART.md
