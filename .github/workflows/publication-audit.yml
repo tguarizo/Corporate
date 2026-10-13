@@ -1,0 +1,64 @@
+name: Audit Alpha publication target
+on:
+  push:
+    branches: [codex/alpha-publication-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify configured SSH prerequisites
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'Missing SSH_PRIVATE_KEY'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'Missing SERVER_HOST'; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+      - name: Read VPS service and Caddy routing information
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
+        run: |
+          set -euo pipefail
+          # Initial host key uses OpenSSH TOFU; changed host keys remain rejected.
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "${SERVER_USER}@${SERVER_HOST}" bash -s <<'REMOTE'
+          set -euo pipefail
+          docker ps --format '{{.Names}} {{.Image}} {{.Ports}}'
+          docker inspect caddy_global --format '{{json .Mounts}}'
+          docker exec caddy_global caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null | python3 -c '
+          import json,sys
+          from urllib.parse import urlsplit
+          data=json.load(sys.stdin)
+          targets={"tuuvo.app.br","tuuvo.com.br","dev.coonto.com"}
+          def visit(x):
+              if isinstance(x,dict):
+                  hosts=[]
+                  for m in x.get("match",[]):
+                      if isinstance(m,dict): hosts.extend(m.get("host",[]))
+                  if targets.intersection(hosts):
+                      dials=[]
+                      def collect(y):
+                          if isinstance(y,dict):
+                              if y.get("handler")=="reverse_proxy":
+                                  for u in y.get("upstreams",[]):
+                                      dial=u.get("dial","")
+                                      if "@" in dial: dial=dial.rsplit("@",1)[1]
+                                      dials.append(dial)
+                              for v in y.values(): collect(v)
+                          elif isinstance(y,list):
+                              for v in y: collect(v)
+                      collect(x.get("handle",[]))
+                      print(json.dumps({"hosts":hosts,"upstreams":dials}))
+                  for v in x.values(): visit(v)
+              elif isinstance(x,list):
+                  for v in x: visit(v)
+          visit(data)
+          '
+          REMOTE
