@@ -67,6 +67,19 @@ jobs:
           print(json.dumps({"hosts":["admin-status"],"upstreams":["disabled" if data.get("admin",{}).get("disabled") else "enabled"]}))
           '
           docker inspect coonto-corporate-alpha --format '{"hosts":["alpha-status"],"upstreams":["{{.State.Status}}"]}' 2>/dev/null || true
+          python3 - <<'PYDIAG'
+          import subprocess,json
+          p=subprocess.run(['docker','inspect','coonto-corporate-alpha'],capture_output=True,text=True)
+          if p.returncode==0:
+              d=json.loads(p.stdout)[0]
+              connected='corporate_alpha_internal' in d['NetworkSettings']['Networks']
+              print(json.dumps({'hosts':['alpha-network'],'upstreams':['attached' if connected else 'absent']}))
+          p=subprocess.run(['docker','inspect','caddy_global'],capture_output=True,text=True)
+          if p.returncode==0:
+              d=json.loads(p.stdout)[0]
+              print(json.dumps({'hosts':['proxy-state'],'upstreams':[d['State']['Status']]}))
+              print(json.dumps({'hosts':['proxy-start-config'],'upstreams':['expected' if '/etc/caddy/Caddyfile' in d.get('Args',[]) else 'different']}))
+          PYDIAG
           REMOTE
           )"
           printf "fingerprint=%s\n" "$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}' | head -n1)" >> "$GITHUB_OUTPUT"
@@ -79,7 +92,7 @@ jobs:
               except ValueError: continue
               if not isinstance(item,dict) or 'hosts' not in item: continue
               for host in item['hosts']:
-                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config']:
                       dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
                       dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
                       parts.append(host+'='+dials)
