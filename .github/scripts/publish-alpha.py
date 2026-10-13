@@ -130,7 +130,7 @@ try:
         d=json.load(r)
         if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.0':raise RuntimeError('Public host returned wrong service')
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
-        if r.status!=200 or b'<!DOCTYPE html>' not in r.read(100000):raise RuntimeError('Public experience failed')
+        if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
     print('PUBLISHED: Alpha 0.1.0-alpha.0; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
 except BaseException:
     if changed:
