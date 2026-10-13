@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to corporate-dev.coonto.com
+    name: Deploy to tuuvo.app.br
     runs-on: ubuntu-latest
 
     steps:
@@ -16,18 +16,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup SSH Key
-        if: env.SSH_PRIVATE_KEY != ''
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
+          test -n "$SSH_PRIVATE_KEY" && test -n "$SERVER_HOST" || { echo "Deploy secrets missing"; exit 1; }
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
 
       - name: Package and Deploy
-        if: env.SSH_PRIVATE_KEY != ''
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
@@ -40,7 +39,3 @@ jobs:
           scp -o StrictHostKeyChecking=no /tmp/corporate-dev.tar.gz ${SERVER_USER}@${SERVER_HOST}:/tmp/corporate-dev.tar.gz
           ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} "mkdir -p ${DEPLOY_PATH} && tar -xzf /tmp/corporate-dev.tar.gz -C ${DEPLOY_PATH} --strip-components=1 && rm -f /tmp/corporate-dev.tar.gz && cd ${DEPLOY_PATH} && chmod +x corporate.sh && ./corporate.sh install"
 
-      - name: Notify configuration needed
-        if: env.SSH_PRIVATE_KEY == ''
-        run: |
-          echo "::warning ::SSH_PRIVATE_KEY secret não configurado no repositório. O deploy automático iniciará assim que os secrets forem preenchidos."
