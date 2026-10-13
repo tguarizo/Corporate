@@ -18,6 +18,8 @@ jobs:
       result: ${{ steps.deploy.outputs.result }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Verify SSH configuration and audited host identity
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
