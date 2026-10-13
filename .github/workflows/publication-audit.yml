@@ -78,7 +78,9 @@ jobs:
           if p.returncode==0:
               d=json.loads(p.stdout)[0]
               print(json.dumps({'hosts':['proxy-state'],'upstreams':[d['State']['Status']]}))
-              print(json.dumps({'hosts':['proxy-start-config'],'upstreams':['expected' if '/etc/caddy/Caddyfile' in d.get('Args',[]) else 'different']}))
+              print(json.dumps({'hosts':['proxy-start-config','sudo-status'],'upstreams':['expected' if '/etc/caddy/Caddyfile' in d.get('Args',[]) else 'different']}))
+          p=subprocess.run(['sudo','-n','python3','-c','import os; assert os.geteuid()==0'],capture_output=True,text=True)
+          print(json.dumps({'hosts':['sudo-status'],'upstreams':['ready' if p.returncode==0 else 'unavailable']}))
           PYDIAG
           REMOTE
           )"
@@ -92,7 +94,7 @@ jobs:
               except ValueError: continue
               if not isinstance(item,dict) or 'hosts' not in item: continue
               for host in item['hosts']:
-                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config','sudo-status']:
                       dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
                       dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
                       parts.append(host+'='+dials)
