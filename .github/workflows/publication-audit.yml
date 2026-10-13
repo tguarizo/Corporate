@@ -9,6 +9,8 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      summary: ${{ steps.remote.outputs.summary }}
     steps:
       - name: Verify configured SSH prerequisites
         env:
@@ -22,13 +24,14 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
       - name: Read VPS service and Caddy routing information
+        id: remote
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
         run: |
           set -euo pipefail
           # Initial host key uses OpenSSH TOFU; changed host keys remain rejected.
-          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "${SERVER_USER}@${SERVER_HOST}" bash -s <<'REMOTE'
+          audit_result="$(ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "${SERVER_USER}@${SERVER_HOST}" bash -s <<'REMOTE'
           set -euo pipefail
           docker ps --format '{{.Names}} {{.Image}} {{.Ports}}'
           docker inspect caddy_global --format '{{json .Mounts}}'
@@ -62,3 +65,26 @@ jobs:
           visit(data)
           '
           REMOTE
+          )"
+          export AUDIT_RESULT="$audit_result"
+          python3 - <<'PYRESULT'
+          import os,json,re
+          parts=[]
+          for line in os.environ['AUDIT_RESULT'].splitlines():
+              try: item=json.loads(line)
+              except ValueError: continue
+              if not isinstance(item,dict) or 'hosts' not in item: continue
+              for host in item['hosts']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com']:
+                      dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
+                      dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
+                      parts.append(host+'='+dials)
+          if not parts: raise SystemExit('No target routing information obtained')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('summary='+'; '.join(parts)+'\n')
+          PYRESULT
+  result:
+    needs: audit
+    name: "VPS routing: ${{ needs.audit.outputs.summary }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Read-only audit completed; services unchanged.'
