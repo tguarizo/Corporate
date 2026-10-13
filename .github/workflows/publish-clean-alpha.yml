@@ -65,10 +65,10 @@ jobs:
           publication_status=$?
           set -e
           if [ "$publication_status" = 0 ]; then
-            result=$(tail -n 1 /tmp/publication-result)
+            result=OK
           else
-            result=$(grep -E '(RuntimeError|PermissionError|FileNotFoundError|TypeError|SyntaxError):' /tmp/publication-result | tail -n 1 || true)
-            result="FAILED: ${result:-publication command exited $publication_status}"
+            result=$(grep -E '^DEPLOY_CODE=E[0-9][0-9]$' /tmp/publication-result | tail -n 1 | cut -d= -f2 || true)
+            result="${result:-E99}"
           fi
           printf 'result=%s\n' "$result" >> "$GITHUB_OUTPUT"
           cat /tmp/publication-result
