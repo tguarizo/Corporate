@@ -1,0 +1,38 @@
+name: Diagnose Alpha publication logs
+on:
+  push:
+    branches: [codex/alpha-publication-audit]
+    paths: [.github/workflows/publication-log-diagnosis.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    outputs:
+      codes: ${{ steps.log.outputs.codes }}
+    steps:
+      - name: Classify failed operations without exporting log contents
+        id: log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run view 38476365413 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
+          python3 - <<'PY'
+          import os
+          text=open('/tmp/private-run-log').read()
+          commands={'docker network disconnect':'N1','docker network connect':'N2','docker stop':'D1','docker rename':'D2','docker rm':'D3','docker restart':'D4','docker exec':'X1','docker run':'C1','Public host returned wrong service':'H1','HTTP Error 502':'H2','JSONDecodeError:':'J1','PermissionError:':'P1','FileNotFoundError:':'F1'}
+          found=[]
+          for line in text.splitlines():
+              if not any(x in line for x in ['RuntimeError:','HTTPError:','JSONDecodeError:','PermissionError:','FileNotFoundError:']): continue
+              for phrase,code in commands.items():
+                  if phrase in line:found.append(code)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('codes='+('_'.join(found) or 'UNKNOWN')+'\n')
+          PY
+  result:
+    needs: diagnose
+    name: "Failure operation codes: ${{ needs.diagnose.outputs.codes }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Only predefined operation codes were exported.'
