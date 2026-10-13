@@ -1,9 +1,16 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const http = require('http');
 
 const PORT = process.env.PORT || 3000;
 const VERSION = '0.1.0-alpha';
 
 const server = http.createServer((req, res) => {
+  if (req.url === '/experience' || req.url === '/experience/') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(fs.readFileSync(path.join(__dirname, 'public', 'experience.html'), 'utf8'));
+    return;
+  }
   if (req.url === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
