@@ -14,6 +14,12 @@ def run(*args, capture=True):
     if p.returncode: raise RuntimeError('Command failed: '+' '.join(args))
     return p.stdout if capture else ''
 
+def activate_config():
+    try:
+        run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
+    except RuntimeError:
+        run('docker','restart','caddy_global')
+
 def rewrite(text):
     tokens=list(re.finditer(r'#[^\n]*|"(?:\\.|[^"\\])*"|`[^`]*`|[{}]|[^\s{},]+',text))
     depth=0; header=[]; blocks=[]; current=None
@@ -143,7 +149,7 @@ try:
     changed=True
     with open(config,'w') as f:f.write(candidate);f.flush();os.fsync(f.fileno())
     STAGE='E12'
-    run('docker','restart','caddy_global')
+    activate_config()
     STAGE='E13'
     for attempt in range(20):
         try:
@@ -164,7 +170,7 @@ except BaseException:
     STAGE='E15'
     if changed:
         with open(config,'w') as f:f.write(original);f.flush();os.fsync(f.fileno())
-        run('docker','restart','caddy_global')
+        activate_config()
     if started:run('docker','rm','-f',APP)
     if old:
         run('docker','rename',old,APP);run('docker','network','connect',NETWORK,APP);run('docker','start',APP)
