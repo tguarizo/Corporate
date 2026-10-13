@@ -6,7 +6,7 @@ TARGET='tuuvo.app.br'
 
 def run(*args, capture=True):
     p=subprocess.run(args,stdout=subprocess.PIPE if capture else None,stderr=subprocess.PIPE if capture else None,text=True)
-    if p.returncode: raise RuntimeError('Command failed: '+' '.join(args[:3]))
+    if p.returncode: raise RuntimeError('Command failed: '+' '.join(args))
     return p.stdout if capture else ''
 
 def rewrite(text):
@@ -90,9 +90,9 @@ backup=base/('Caddyfile.before-alpha-'+str(int(time.time())))
 backup.write_text(original);os.chmod(backup,0o600)
 candidate_file=base/'Caddyfile.alpha-candidate';candidate_file.write_text(candidate);os.chmod(candidate_file,0o600)
 run('docker','cp',str(candidate_file),'caddy_global:/tmp/corporate-alpha-Caddyfile')
-run('docker','exec','caddy_global','caddy','validate','--config','/tmp/corporate-alpha-Caddyfile')
-before=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile'))
-after=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/tmp/corporate-alpha-Caddyfile'))
+run('docker','exec','caddy_global','caddy','validate','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile')
+before=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'))
+after=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile'))
 for host in ['tuuvo.com.br','dev.coonto.com']:
     if not routes(before,host) or routes(before,host)!=routes(after,host):raise RuntimeError('Unrelated routing would change: '+host)
 if not routes(after,TARGET):raise RuntimeError('Alpha target missing from candidate config')
@@ -124,7 +124,7 @@ try:
     # Preserve the mounted inode: atomic replacement would leave Docker using the old file.
     changed=True
     with open(config,'w') as f:f.write(candidate);f.flush();os.fsync(f.fileno())
-    run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile')
+    run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
     with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=20) as r:
         if r.status!=200:raise RuntimeError('Public HTTP health failed')
         d=json.load(r)
@@ -135,7 +135,7 @@ try:
 except BaseException:
     if changed:
         with open(config,'w') as f:f.write(original);f.flush();os.fsync(f.fileno())
-        run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile')
+        run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
     if started:run('docker','rm','-f',APP)
     if old:
         run('docker','rename',old,APP);run('docker','network','connect',NETWORK,APP);run('docker','start',APP)
