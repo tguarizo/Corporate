@@ -1,7 +1,7 @@
-FROM node:20-alpine
-
+FROM node:22-alpine
 WORKDIR /app
-COPY server.js ./
-
+COPY . .
+ENV NODE_ENV=production PORT=3000
+USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node","server.js"]

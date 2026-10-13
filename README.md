@@ -1,19 +1,12 @@
-# Coonto Corporate
+# Coonto Corporate Alpha — reconstrução limpa
 
-Repositório da plataforma Coonto Corporate (v0.1 Alpha).
+Este é um novo código-base, sem dependência do protótipo anterior. Execute `npm test` e `npm start` (Node.js 22+). Abra http://localhost:3000.
 
-## Domínios & Ambientes
-- **Desenvolvimento:** `https://corporate-dev.coonto.com`
-- **Healthcheck:** `https://corporate-dev.coonto.com/api/health`
+## Estado real
+Demonstração estruturada visual e responsiva, motor de estados determinístico e testes unitários. **Não** contém ainda multi-tenancy, autenticação corporativa, EVE, IA híbrida ou termômetro validado. Nenhuma API privada de clientes é disponibilizada nesta entrega.
 
-## Arquitetura
-- **App:** Aplicação Node.js / Next.js na porta interna `3200`.
-- **Database:** PostgreSQL 16 dedicado com volume persistente isolado (`corporate_postgres`).
-- **Proxy Reverso & SSL:** Caddy com certificados automáticos Let's Encrypt.
+## Publicação
+Alvo aprovado: https://tuuvo.app.br. Sem mudança de DNS/Caddy até validação independente do roteamento. O site tuuvo.com.br e o Coonto Educação são serviços separados. Este novo ramo não tem workflow de deploy intencionalmente, para evitar publicação no host errado.
 
-## Deploy Contínuo (CI/CD)
-O deploy é realizado automaticamente via GitHub Actions em push na branch `develop`:
-1. Empacota a aplicação
-2. Envia para a VPS (`/opt/coonto/corporate-dev`)
-3. Executa backup de segurança do PostgreSQL
-4. Executa `./corporate.sh install` com validação de healthcheck e suporte a rollback (`./corporate.sh rollback`).
+## Critérios antes de aceitar clientes
+Implementar PostgreSQL com isolamento tenant/RLS, autenticação, segregação de dados, upload privado com antivírus/limites, EVE rastreável, auditoria de decisões, políticas de IA e testes de segurança e navegador.
