@@ -1,5 +1,5 @@
 name: Publish clean Corporate Alpha
-# Validate with explicit Caddyfile adapter before any routing change.
+# Apply validated Caddyfile using verified proxy startup configuration.
 on:
   push:
     branches: [codex/alpha-publication-audit]
