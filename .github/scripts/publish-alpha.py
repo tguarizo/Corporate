@@ -90,6 +90,9 @@ for m in mounts:
     if dest=='/etc/caddy/Caddyfile':config=pathlib.Path(m['Source'])
     elif dest=='/etc/caddy':config=pathlib.Path(m['Source'])/'Caddyfile'
 if config is None or not config.is_file():raise RuntimeError('Caddyfile host mount could not be established')
+startup=json.loads(run('docker','inspect','caddy_global'))[0]
+startup_args=[startup.get('Path','')]+startup.get('Args',[])
+if '/etc/caddy/Caddyfile' not in startup_args:raise RuntimeError('Proxy restart must use the verified configuration path')
 original=config.read_text()
 candidate=rewrite(original)
 backup=base/('Caddyfile.before-alpha-'+str(int(time.time())))
@@ -140,12 +143,18 @@ try:
     changed=True
     with open(config,'w') as f:f.write(candidate);f.flush();os.fsync(f.fileno())
     STAGE='E12'
-    run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
+    run('docker','restart','caddy_global')
     STAGE='E13'
-    with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=20) as r:
-        if r.status!=200:raise RuntimeError('Public HTTP health failed')
-        d=json.load(r)
-        if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.0':raise RuntimeError('Public host returned wrong service')
+    for attempt in range(20):
+        try:
+            with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=10) as r:
+                if r.status!=200:raise RuntimeError('Public HTTP health failed')
+                d=json.load(r)
+                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.0':raise RuntimeError('Public host returned wrong service')
+            break
+        except Exception:
+            if attempt==19:raise
+            time.sleep(2)
     STAGE='E14'
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
         if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
@@ -155,7 +164,7 @@ except BaseException:
     STAGE='E15'
     if changed:
         with open(config,'w') as f:f.write(original);f.flush();os.fsync(f.fileno())
-        run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
+        run('docker','restart','caddy_global')
     if started:run('docker','rm','-f',APP)
     if old:
         run('docker','rename',old,APP);run('docker','network','connect',NETWORK,APP);run('docker','start',APP)
