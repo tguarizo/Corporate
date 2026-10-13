@@ -3,6 +3,11 @@ SHA='06cdfd11108b7ae9433e71e6833ae111871449e9'
 APP='coonto-corporate-alpha'
 NETWORK='corporate_alpha_internal'
 TARGET='tuuvo.app.br'
+STAGE='E01'
+def safe_exception(typ,value,tb):
+    print('DEPLOY_CODE='+STAGE,flush=True)
+    sys.__excepthook__(typ,value,tb)
+sys.excepthook=safe_exception
 
 def run(*args, capture=True):
     p=subprocess.run(args,stdout=subprocess.PIPE if capture else None,stderr=subprocess.PIPE if capture else None,text=True)
@@ -77,6 +82,7 @@ for root,dirs,files in os.walk(release):
     os.chmod(root,0o755)
     for name in files:os.chmod(pathlib.Path(root)/name,0o644)
 # Check the existing proxy configuration before changing services.
+STAGE='E02'
 mounts=json.loads(run('docker','inspect','caddy_global','--format','{{json .Mounts}}'))
 config=None
 for m in mounts:
@@ -90,31 +96,39 @@ backup=base/('Caddyfile.before-alpha-'+str(int(time.time())))
 backup.write_text(original);os.chmod(backup,0o600)
 candidate_file=base/'Caddyfile.alpha-candidate';candidate_file.write_text(candidate);os.chmod(candidate_file,0o600)
 run('docker','cp',str(candidate_file),'caddy_global:/tmp/corporate-alpha-Caddyfile')
+STAGE='E03'
 run('docker','exec','caddy_global','caddy','validate','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile')
 before=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'))
 after=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile'))
+STAGE='E04'
 for host in ['tuuvo.com.br','dev.coonto.com']:
     if not routes(before,host) or routes(before,host)!=routes(after,host):raise RuntimeError('Unrelated routing would change: '+host)
 if not routes(after,TARGET):raise RuntimeError('Alpha target missing from candidate config')
 image='coonto-corporate-alpha:'+SHA[:7]
+STAGE='E05'
 run('docker','build','-t',image,str(release))
+STAGE='E06'
 run('docker','run','--rm',image,'npm','test')
 if '--preflight' in sys.argv:
     print('PREFLIGHT PASS: Caddy target isolated, other handlers unchanged, Node 22 image built and tests passed')
     sys.exit(0)
+STAGE='E07'
 if subprocess.run(['docker','network','inspect',NETWORK],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:
     run('docker','network','create',NETWORK)
 nets=json.loads(run('docker','inspect','caddy_global','--format','{{json .NetworkSettings.Networks}}'))
 if NETWORK not in nets:run('docker','network','connect',NETWORK,'caddy_global')
 old=None;started=False;changed=False
 try:
+    STAGE='E08'
     exists=subprocess.run(['docker','container','inspect',APP],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0
     if exists:
         old=APP+'-previous-'+str(int(time.time()))
         run('docker','stop',APP);run('docker','rename',APP,old)
         run('docker','network','disconnect',NETWORK,old)
+    STAGE='E09'
     run('docker','run','-d','--restart','unless-stopped','--name',APP,'--network',NETWORK,image)
     started=True
+    STAGE='E10'
     health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.0')throw Error('wrong service')}).catch(()=>process.exit(1))"
     for attempt in range(20):
         p=subprocess.run(['docker','exec',APP,'node','-e',health_script],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -122,21 +136,28 @@ try:
         time.sleep(1)
     else:raise RuntimeError('Alpha readiness failed')
     # Preserve the mounted inode: atomic replacement would leave Docker using the old file.
+    STAGE='E11'
     changed=True
     with open(config,'w') as f:f.write(candidate);f.flush();os.fsync(f.fileno())
+    STAGE='E12'
     run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
+    STAGE='E13'
     with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=20) as r:
         if r.status!=200:raise RuntimeError('Public HTTP health failed')
         d=json.load(r)
         if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.0':raise RuntimeError('Public host returned wrong service')
+    STAGE='E14'
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
         if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
     print('PUBLISHED: Alpha 0.1.0-alpha.0; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
 except BaseException:
+    failure_stage=STAGE
+    STAGE='E15'
     if changed:
         with open(config,'w') as f:f.write(original);f.flush();os.fsync(f.fileno())
         run('docker','exec','caddy_global','caddy','reload','--config','/etc/caddy/Caddyfile','--adapter','caddyfile')
     if started:run('docker','rm','-f',APP)
     if old:
         run('docker','rename',old,APP);run('docker','network','connect',NETWORK,APP);run('docker','start',APP)
+    STAGE=failure_stage
     raise
