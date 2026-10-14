@@ -23,7 +23,7 @@ O navegador guarda o primeiro percurso e até 19 percursos posteriores, sem iden
 
 ## Mídias
 
-A imagem de abertura é uma ilustração original produzida para esta demonstração. O vídeo é uma animação dessa ilustração, sem áudio, com legendas em português. As outras fases usam ilustrações SVG. Os recursos são servidos pelo próprio aplicativo e o vídeo suporta intervalos de bytes.
+A imagem de abertura é uma ilustração original produzida para esta demonstração. O vídeo é uma animação dessa ilustração, com narração sintética em português, três cenas e legendas. As outras fases usam ilustrações SVG. Os recursos são servidos pelo próprio aplicativo e o vídeo suporta intervalos de bytes.
 
 ## Publicação e isolamento
 
