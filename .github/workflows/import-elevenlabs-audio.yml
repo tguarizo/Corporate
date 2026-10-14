@@ -1,0 +1,32 @@
+name: Import generated ElevenLabs narration
+on:
+  push:
+    branches: [feature/jornada-multimidia]
+    paths: [.github/workflows/import-elevenlabs-audio.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/jornada-multimidia
+      - uses: actions/download-artifact@v4
+        with:
+          name: elevenlabs-narration
+          run-id: 38501466046
+          github-token: ${{ github.token }}
+          path: public/assets/narration
+      - name: Save generated public audio without credentials
+        run: |
+          set -euo pipefail
+          test -s public/assets/narration/segment-1.mp3
+          test -s public/assets/narration/segment-2.mp3
+          test -s public/assets/narration/segment-3.mp3
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/assets/narration
+          git commit -m 'Add ElevenLabs Portuguese narration for Alpha introduction'
+          git push origin HEAD:feature/jornada-multimidia
