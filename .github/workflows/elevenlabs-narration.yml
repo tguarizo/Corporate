@@ -1,4 +1,5 @@
 name: Generate ElevenLabs Alpha narration
+# Check available credentials and restricted voice-list permissions.
 on:
   push:
     branches: [feature/jornada-multimidia]

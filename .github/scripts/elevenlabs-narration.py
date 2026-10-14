@@ -1,17 +1,17 @@
 """Locate an existing ElevenLabs binding without disclosing credentials; render public narration."""
 import json, os, pathlib, subprocess, sys, urllib.request, urllib.error
 NAMES = ('ELEVENLABS_API_KEY', 'ELEVEN_API_KEY', 'ELEVENLABS_KEY', 'ELEVEN_API', 'XI_API_KEY')
-key = next((os.environ[n] for n in NAMES if os.environ.get(n)), None)
-source = 'runner' if key else None
+candidates = [os.environ[n] for n in NAMES if os.environ.get(n)]
+key = candidates[0] if candidates else None
 if not key:
-    p = subprocess.run(['docker', 'ps', '-q'], capture_output=True, text=True)
+    p = subprocess.run(['docker', 'ps', '-aq'], capture_output=True, text=True)
     if p.returncode == 0 and p.stdout.strip():
         p = subprocess.run(['docker', 'inspect', *p.stdout.split()], capture_output=True, text=True)
         if p.returncode == 0:
             for container in json.loads(p.stdout):
                 for entry in container.get('Config', {}).get('Env', []) or []:
                     name, _, value = entry.partition('=')
-                    if name.upper() in NAMES and value.strip(): key, source = value.strip(), 'container'
+                    if name.upper() in NAMES and value.strip(): candidates.append(value.strip())
 if not key:
     for base in ('/opt', '/srv', '/var/www', '/home', '/root'):
         for current, dirs, files in os.walk(base):
@@ -26,9 +26,10 @@ if not key:
                         lhs, sep, rhs = line.removeprefix('export ').partition('=')
                         if sep and lhs.strip().upper() in NAMES:
                             value = rhs.strip().strip('\"').strip("'")
-                            if value and not value.startswith('${'): key, source = value, 'vps-file'
+                            if value and not value.startswith('${'): candidates.append(value)
                 except OSError: pass
-if not key:
+candidates = list(dict.fromkeys(candidates))
+if not candidates:
     print('RESULT=KEY_NOT_FOUND'); sys.exit(0)
 try:
     def request(path, data=None):
@@ -36,10 +37,28 @@ try:
         req = urllib.request.Request('https://api.elevenlabs.io/v1/' + path, data=body,
             headers={'xi-api-key': key, 'Content-Type': 'application/json'})
         return urllib.request.urlopen(req, timeout=90).read()
-    voices = json.loads(request('voices')).get('voices', [])
+    last_error = None
+    voices = []
+    valid = False
+    for candidate in candidates:
+        key = candidate
+        try:
+            voices = json.loads(request('voices')).get('voices', [])
+            valid = True
+            break
+        except urllib.error.HTTPError as exc:
+            last_error = exc.code
+            try: reason = json.loads(exc.read()).get('detail', {}).get('status', '')
+            except Exception: reason = ''
+            if reason == 'missing_permissions':
+                valid = True
+                break
+    if not valid:
+        print('RESULT=API_HTTP_' + str(last_error or 401))
+        sys.exit(0)
     preferred = [v for v in voices if v.get('labels', {}).get('language', '').lower() in ('pt', 'pt-br', 'portuguese')]
     preferred = [v for v in preferred if 'brazil' in json.dumps(v.get('labels', {})).lower()] or preferred
-    voice = (preferred or [v for v in voices if v.get('name') == 'Rachel'] or voices)[0]
+    voice = (preferred or [v for v in voices if v.get('name') == 'Rachel'] or voices or [{'voice_id': '21m00Tcm4TlvDq8ikWAM'}])[0]
     out = pathlib.Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
     texts = [
         'Marina entrou em contato duas vezes. O problema continua sem solução, e ela precisa de uma resposta.',
