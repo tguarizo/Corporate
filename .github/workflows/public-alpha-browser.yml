@@ -1,5 +1,5 @@
 name: Public Alpha browser validation
-# Recheck the completed multimedia publication.
+# Verify the published layout after the asynchronous journey has opened.
 on:
   push:
     branches: [feature/jornada-multimidia]
