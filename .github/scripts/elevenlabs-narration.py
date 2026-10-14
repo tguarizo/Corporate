@@ -38,6 +38,7 @@ try:
             headers={'xi-api-key': key, 'Content-Type': 'application/json'})
         return urllib.request.urlopen(req, timeout=90).read()
     last_error = None
+    reason = ''
     voices = []
     valid = False
     for candidate in candidates:
@@ -54,7 +55,7 @@ try:
                 valid = True
                 break
     if not valid:
-        print('RESULT=API_HTTP_' + str(last_error or 401))
+        print('RESULT=' + ('INVALID_API_KEY' if reason == 'invalid_api_key' else 'API_HTTP_' + str(last_error or 401)))
         sys.exit(0)
     preferred = [v for v in voices if v.get('labels', {}).get('language', '').lower() in ('pt', 'pt-br', 'portuguese')]
     preferred = [v for v in preferred if 'brazil' in json.dumps(v.get('labels', {})).lower()] or preferred
@@ -73,6 +74,8 @@ try:
     (out / 'provenance.json').write_text(json.dumps({'provider': 'ElevenLabs', 'model': 'eleven_multilingual_v2', 'language': 'pt', 'segments': 3}))
     print('RESULT=GENERATED')
 except urllib.error.HTTPError as exc:
-    print('RESULT=API_HTTP_' + str(exc.code))
+    try: reason = json.loads(exc.read()).get('detail', {}).get('status', '')
+    except Exception: reason = ''
+    print('RESULT=' + ('MISSING_PERMISSIONS' if reason == 'missing_permissions' else 'INVALID_API_KEY' if reason == 'invalid_api_key' else 'API_HTTP_' + str(exc.code)))
 except Exception:
     print('RESULT=GENERATION_FAILED')
