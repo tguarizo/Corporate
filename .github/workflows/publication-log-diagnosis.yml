@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run view 38496573100 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
+          gh run view 38634632440 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
           python3 - <<'PY'
           import os
           text=open('/tmp/private-run-log').read()
@@ -26,7 +26,7 @@ jobs:
           lines=text.splitlines()
           candidates=[]
           for line in lines:
-              for marker in ['locator.click:', 'page.goto:', 'page.waitForFunction:', 'browserType.launch:', 'Expected values to be strictly equal', 'NotSupportedError', 'The expression evaluated to a falsy value']:
+              for marker in ['RuntimeError:', 'PermissionError:', 'FileNotFoundError:', 'OSError:', 'locator.click:', 'page.goto:', 'page.waitForFunction:', 'browserType.launch:', 'Expected values to be strictly equal', 'NotSupportedError', 'The expression evaluated to a falsy value']:
                   if marker in line:
                       message=line[line.index(marker):]
                       candidates.append(message[:500])
