@@ -2,7 +2,7 @@ name: Publish clean Corporate Alpha
 # Apply validated Caddyfile using verified proxy startup configuration.
 on:
   push:
-    branches: [codex/alpha-publication-audit]
+    branches: [feature/jornada-multimidia]
     paths:
       - .github/workflows/publish-clean-alpha.yml
   workflow_dispatch:
@@ -21,6 +21,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate application before publication
+        run: npm test
       - name: Verify SSH configuration and audited host identity
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -46,7 +51,7 @@ jobs:
       - name: Prepare the exact validated Alpha source
         run: |
           set -euo pipefail
-          git archive 06cdfd11108b7ae9433e71e6833ae111871449e9 > /tmp/alpha.tar
+          git archive b13474e26123253563cb758cbdb2eff4baa26f60 > /tmp/alpha.tar
           gzip /tmp/alpha.tar
       - name: Publish Alpha with verified routing and rollback
         id: deploy
@@ -80,3 +85,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo 'Publication result recorded; inspect preceding job for status.'
+  browser:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix /tmp/alpha-browser --no-audit --no-fund --ignore-scripts playwright@1.58.2
+      - name: Validate the published six-phase journey
+        env:
+          NODE_PATH: /tmp/alpha-browser/node_modules
+        run: node .github/scripts/public-browser-smoke.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jornada-multimidia-validada
+          path: /tmp/alpha-browser/*.png
+          retention-days: 7
