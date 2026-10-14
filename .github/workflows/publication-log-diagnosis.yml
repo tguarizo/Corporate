@@ -30,7 +30,10 @@ jobs:
                   if marker in line:
                       message=line[line.index(marker):]
                       candidates.append(message[:500])
-          message=' | '.join(candidates[:3]) or 'No recognized browser error marker in the failed log.'
+          for line in lines:
+              if 'waiting for ' in line and ('getByRole' in line or 'locator(' in line):
+                  candidates.append(line[line.index('waiting for '):][:350])
+          message=' | '.join(candidates[:6]) or 'No recognized browser error marker in the failed log.'
           print('::notice title=Public browser first-run diagnosis::'+message)
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('codes=INSPECTED\n')
           PY
