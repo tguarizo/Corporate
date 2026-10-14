@@ -60,7 +60,7 @@ jobs:
             scp -o BatchMode=yes -o StrictHostKeyChecking=yes .github/scripts/elevenlabs-narration.py "$destination:$remote_dir/generate.py"
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n python3 '$remote_dir/generate.py' '$remote_dir/audio' medical" > /tmp/narration-status
             if grep -q '^RESULT=GENERATED$' /tmp/narration-status; then
-              ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n chmod -R a+rX '$remote_dir/audio' medical"
+              ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n chmod -R a+rX '$remote_dir/audio'"
               scp -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination:$remote_dir/audio/*" /tmp/elevenlabs-audio/
             fi
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n rm -rf '$remote_dir'"
