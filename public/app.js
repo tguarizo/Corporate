@@ -9,9 +9,9 @@ async function start(){state=await api('/api/demo/start');persist();show('journe
 function createIntroPlayer(){
  const video=document.createElement('video');
  video.controls=true;video.preload='metadata';video.playsInline=true;video.muted=false;video.volume=1;
- video.poster='/assets/illustration.png';video.src='/assets/intro.mp4';
+ video.poster='/assets/illustration.png';video.src='/assets/intro.mp4?v=elevenlabs-alpha3';
  video.setAttribute('aria-label','Introdução ilustrada com narração em português');
- const track=document.createElement('track');track.kind='captions';track.srclang='pt-BR';track.label='Português';track.src='/assets/intro.vtt';track.default=true;video.appendChild(track);
+ const track=document.createElement('track');track.kind='captions';track.srclang='pt-BR';track.label='Português';track.src='/assets/intro.vtt?v=elevenlabs-alpha3';track.default=true;video.appendChild(track);
  const play=document.createElement('button');play.className='video-play';play.textContent='Reproduzir vídeo com narração';
  const status=document.createElement('span');status.className='video-status hidden';status.setAttribute('role','status');
  play.onclick=async()=>{play.disabled=true;status.textContent='Carregando a introdução…';status.classList.remove('hidden');try{if(video.ended)video.currentTime=0;await video.play()}catch{status.textContent='Não foi possível reproduzir. Tente novamente.';play.classList.remove('hidden')}finally{play.disabled=false}};
