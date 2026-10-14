@@ -1,5 +1,5 @@
 name: Generate ElevenLabs Alpha narration
-# Check runner and VPS bindings, including restricted voice permissions.
+# Generate the original medical scenario introduction with existing ElevenLabs binding.
 on:
   push:
     branches: [feature/jornada-multimidia]
@@ -51,16 +51,16 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/elevenlabs-audio
           if [ -n "$ELEVENLABS_API_KEY$ELEVEN_API_KEY$ELEVENLABS_KEY$ELEVEN_API$XI_API_KEY" ]; then
-            python3 .github/scripts/elevenlabs-narration.py /tmp/elevenlabs-audio > /tmp/narration-status
+            python3 .github/scripts/elevenlabs-narration.py /tmp/elevenlabs-audio medical > /tmp/narration-status
           fi
           if ! grep -q '^RESULT=GENERATED$' /tmp/narration-status 2>/dev/null; then
             destination="${SERVER_USER}@${SERVER_HOST}"
             remote_dir=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" 'mktemp -d /tmp/alpha-narration.XXXXXX')
             [[ "$remote_dir" =~ ^/tmp/alpha-narration\.[A-Za-z0-9]+$ ]]
             scp -o BatchMode=yes -o StrictHostKeyChecking=yes .github/scripts/elevenlabs-narration.py "$destination:$remote_dir/generate.py"
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n python3 '$remote_dir/generate.py' '$remote_dir/audio'" > /tmp/narration-status
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n python3 '$remote_dir/generate.py' '$remote_dir/audio' medical" > /tmp/narration-status
             if grep -q '^RESULT=GENERATED$' /tmp/narration-status; then
-              ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n chmod -R a+rX '$remote_dir/audio'"
+              ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n chmod -R a+rX '$remote_dir/audio' medical"
               scp -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination:$remote_dir/audio/*" /tmp/elevenlabs-audio/
             fi
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n rm -rf '$remote_dir'"
@@ -70,7 +70,7 @@ jobs:
           echo "result=$result" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: elevenlabs-narration
+          name: elevenlabs-medical-narration
           path: /tmp/elevenlabs-audio/*
           if-no-files-found: ignore
           retention-days: 3

@@ -66,12 +66,18 @@ try:
         'Um protocolo diz que o caso foi resolvido. O outro mostra que a reclamação continua em aberto.',
         'Nesta experiência, suas escolhas mudam o próximo passo. Escute, investigue e descubra as consequências de cada decisão.'
     ]
+    if len(sys.argv)>2 and sys.argv[2]=='medical':
+        texts = [
+            'Ana voltou para uma conversa de acompanhamento. Ela não conseguiu seguir o combinado e está preocupada.',
+            'Nesta consulta simulada, você acompanha um estudante sob supervisão. Suas perguntas podem revelar informações que ainda não apareceram.',
+            'Prepare o encontro, escute e construa os próximos passos com Ana. Ao final, reveja as decisões e o que elas mudaram nesta história fictícia.'
+        ]
     for n, text in enumerate(texts, 1):
         audio = request('text-to-speech/' + voice['voice_id'], {
             'text': text, 'model_id': 'eleven_multilingual_v2', 'language_code': 'pt',
             'voice_settings': {'stability': 0.55, 'similarity_boost': 0.75, 'style': 0.15, 'use_speaker_boost': True}})
         (out / f'segment-{n}.mp3').write_bytes(audio)
-    (out / 'provenance.json').write_text(json.dumps({'provider': 'ElevenLabs', 'model': 'eleven_multilingual_v2', 'language': 'pt', 'segments': 3}))
+    (out / 'provenance.json').write_text(json.dumps({'provider': 'ElevenLabs', 'model': 'eleven_multilingual_v2', 'language': 'pt', 'segments': 3, 'scenario': 'medical' if len(sys.argv)>2 and sys.argv[2]=='medical' else 'corporate', 'voice_id': voice['voice_id']}))
     print('RESULT=GENERATED')
 except urllib.error.HTTPError as exc:
     try: reason = json.loads(exc.read()).get('detail', {}).get('status', '')
