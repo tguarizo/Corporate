@@ -15,18 +15,18 @@ jobs:
           ref: feature/jornada-multimidia
       - uses: actions/download-artifact@v4
         with:
-          name: elevenlabs-narration
-          run-id: 38501466046
+          name: elevenlabs-medical-narration
+          run-id: 38642973667
           github-token: ${{ github.token }}
-          path: public/assets/narration
+          path: public/assets/narration-medical
       - name: Save generated public audio without credentials
         run: |
           set -euo pipefail
-          test -s public/assets/narration/segment-1.mp3
-          test -s public/assets/narration/segment-2.mp3
-          test -s public/assets/narration/segment-3.mp3
+          test -s public/assets/narration-medical/segment-1.mp3
+          test -s public/assets/narration-medical/segment-2.mp3
+          test -s public/assets/narration-medical/segment-3.mp3
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add public/assets/narration
-          git commit -m 'Add ElevenLabs Portuguese narration for Alpha introduction'
+          git add public/assets/narration-medical
+          git commit -m 'Add ElevenLabs Portuguese narration for medical introduction'
           git push origin HEAD:feature/jornada-multimidia
