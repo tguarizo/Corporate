@@ -3,7 +3,7 @@ import {readFile,stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {resolveStep,initialState,resumeState,VERSION,benchmark} from './src/engine.js';
+import {resolveStep,initialState,resumeState,VERSION,benchmark,experiences} from './src/engine.js';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const security={'X-Content-Type-Options':'nosniff','Cache-Control':'no-store'};
 const send=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8',...security});res.end(JSON.stringify(obj));};
@@ -11,12 +11,13 @@ const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=u
 const server=http.createServer(async(req,res)=>{try{
  const url=new URL(req.url,'http://localhost');
  if(req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{status:'ok',service:'coonto-corporate',version:VERSION});
- if(req.method==='GET'&&url.pathname==='/api/demo/start')return send(res,200,initialState());
- if(req.method==='GET'&&url.pathname==='/api/demo/benchmark'){const score=Number(url.searchParams.get('score'));if(!Number.isFinite(score)||score<0||score>100)return send(res,400,{error:'invalid_score'});try{return send(res,200,benchmark(score,url.searchParams.get('scope')||'all'))}catch{return send(res,400,{error:'invalid_scope'})}}
+ if(req.method==='GET'&&url.pathname==='/api/experiences')return send(res,200,{experiences});
+ if(req.method==='GET'&&url.pathname==='/api/demo/start'){try{return send(res,200,initialState(url.searchParams.get('experience')||'corporate'))}catch{return send(res,400,{error:'invalid_experience'})}}
+ if(req.method==='GET'&&url.pathname==='/api/demo/benchmark'){const score=Number(url.searchParams.get('score'));if(!Number.isFinite(score)||score<0||score>100)return send(res,400,{error:'invalid_score'});try{return send(res,200,benchmark(score,url.searchParams.get('scope')||'all',url.searchParams.get('experience')||'corporate'))}catch{return send(res,400,{error:'invalid_scope'})}}
  if(req.method==='POST'&&['/api/demo/step','/api/demo/resume'].includes(url.pathname)){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8192)return send(res,413,{error:'too_large'});}
   let payload;try{payload=JSON.parse(raw)}catch{return send(res,400,{error:'invalid_json'})}
-  try{return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history):resolveStep(payload))}catch{return send(res,400,{error:'invalid_step'})}
+  try{return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history,payload.experience||'corporate'):resolveStep(payload))}catch{return send(res,400,{error:'invalid_step'})}
  }
  let file;
  if(['/','/experience','/coonto'].includes(url.pathname))file='index.html';
