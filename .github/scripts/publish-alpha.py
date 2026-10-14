@@ -20,7 +20,7 @@ def activate_config():
     except RuntimeError:
         run('docker','restart','caddy_global')
 
-def rewrite(text):
+def rewrite(text,allow_missing=False):
     tokens=list(re.finditer(r'#[^\n]*|"(?:\\.|[^"\\])*"|`[^`]*`|[{}]|[^\s{},]+',text))
     depth=0; header=[]; blocks=[]; current=None
     for token in tokens:
@@ -41,6 +41,8 @@ def rewrite(text):
     for (labels,opening),closing in blocks:
         matching=[t for t in labels if t.group() in [TARGET,'https://'+TARGET,TARGET+':443','https://'+TARGET+':443']]
         if matching:matches.append((labels,opening,closing,matching))
+    if not matches and allow_missing:
+        return text.rstrip()+'\n\n'+TARGET+' {\n    reverse_proxy '+APP+':3000\n}\n'
     if len(matches)!=1:raise RuntimeError('Target must appear in exactly one explicit Caddyfile site block')
     labels,opening,closing,matching=matches[0]
     if len(matching)!=1:raise RuntimeError('Ambiguous target labels')
@@ -72,7 +74,16 @@ if '--test-rewrite' in sys.argv:
     for original,expected in examples:
         updated=rewrite(original);assert expected in updated;assert updated.count('tuuvo.app.br')==1
         if 'dev.coonto.com' in original:assert 'dev.coonto.com { reverse_proxy school:3000 }' in updated
-    print('PASS: shared and isolated Caddy site rewrite preserves unrelated site blocks')
+    missing='dev.coonto.com { reverse_proxy school:3000 }\n'
+    added=rewrite(missing,allow_missing=True)
+    assert added.startswith(missing.rstrip()) and added.count(TARGET)==1
+    try:rewrite(missing)
+    except RuntimeError:pass
+    else:raise AssertionError('Missing sites require explicit opt-in')
+    try:rewrite(TARGET+' { respond 200 }\n'+TARGET+' { respond 201 }',allow_missing=True)
+    except RuntimeError:pass
+    else:raise AssertionError('Duplicate sites must remain rejected')
+    print('PASS: shared, isolated and missing target handling preserves unrelated site blocks')
     sys.exit(0)
 
 archive=pathlib.Path(sys.argv[1]).resolve()
@@ -100,7 +111,8 @@ startup=json.loads(run('docker','inspect','caddy_global'))[0]
 startup_args=[startup.get('Path','')]+startup.get('Args',[])
 if '/etc/caddy/Caddyfile' not in startup_args:raise RuntimeError('Proxy restart must use the verified configuration path')
 original=config.read_text()
-candidate=rewrite(original)
+baseline=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'))
+candidate=rewrite(original,allow_missing=not routes(baseline,TARGET))
 backup=base/('Caddyfile.before-alpha-'+str(int(time.time())))
 backup.write_text(original);os.chmod(backup,0o600)
 candidate_file=base/'Caddyfile.alpha-candidate';candidate_file.write_text(candidate);os.chmod(candidate_file,0o600)
@@ -111,7 +123,7 @@ before=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config',
 after=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile'))
 STAGE='E04'
 for host in ['tuuvo.com.br','dev.coonto.com']:
-    if not routes(before,host) or routes(before,host)!=routes(after,host):raise RuntimeError('Unrelated routing would change: '+host)
+    if routes(before,host)!=routes(after,host):raise RuntimeError('Unrelated routing would change: '+host)
 if not routes(after,TARGET):raise RuntimeError('Alpha target missing from candidate config')
 image='coonto-corporate-alpha:'+SHA[:7]
 STAGE='E05'

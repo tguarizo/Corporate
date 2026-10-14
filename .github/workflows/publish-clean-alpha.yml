@@ -1,5 +1,5 @@
 name: Publish clean Corporate Alpha
-# Apply validated Caddyfile using verified proxy startup configuration.
+# Restore an absent Alpha host without changing other routes, then publish validated source.
 on:
   push:
     branches: [feature/jornada-multimidia]
