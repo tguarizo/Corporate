@@ -1,24 +1,2 @@
-const { chromium } = require('playwright');
-const assert = require('node:assert/strict');
-(async () => {
- const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
- const options = {headless:true,executablePath:'/usr/bin/google-chrome'};
- if(proxyUrl){const u=new URL(proxyUrl);options.proxy={server:`${u.protocol}//${u.hostname}:${u.port}`};if(u.username)options.proxy.username=decodeURIComponent(u.username);if(u.password)options.proxy.password=decodeURIComponent(u.password);}
- const browser=await chromium.launch(options);
- try {
-  const page=await browser.newPage({viewport:{width:1280,height:800}});
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  const response=await page.goto('https://tuuvo.app.br/experience',{waitUntil:'networkidle'});assert.equal(response.status(),200);
-  await page.getByRole('button',{name:'Investigar o histórico',exact:true}).click();
-  await page.waitForFunction(()=>document.getElementById('sceneTitle').textContent==='Uma pista importante');
-  await page.getByRole('button',{name:'Verificar os registros',exact:true}).click();
-  await page.waitForFunction(()=>document.getElementById('sceneTitle').textContent==='Contexto esclarecido');
-  await page.getByRole('button',{name:'Revisitar outros caminhos',exact:true}).click();
-  await page.waitForFunction(()=>document.getElementById('sceneTitle').textContent==='A reclamação');
-  await page.setViewportSize({width:390,height:844});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await page.screenshot({path:'/tmp/alpha-browser/alpha-publicada.png',fullPage:true});
-  assert.deepEqual(errors,[]);
-  console.log('PASS: public browser branching, completion, restart and mobile width; no JavaScript errors');
- } finally {await browser.close();}
-})().catch(e=>{console.error(e.message);process.exit(1)});
+const {chromium}=require('playwright');const assert=require('node:assert/strict');
+(async()=>{const base=process.env.ALPHA_BASE_URL||'https://tuuvo.app.br';const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome'});try{const page=await browser.newPage({viewport:{width:1280,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));const response=await page.goto(base+'/experience',{waitUntil:'networkidle'});assert.equal(response.status(),200);await page.getByRole('button',{name:/Começar a experiência/}).click();await page.locator('video').evaluate(async v=>{await v.play()});await page.waitForFunction(()=>document.querySelector('video').readyState>=2&&document.querySelector('video').duration>0);assert.ok(await page.locator('video').evaluate(v=>v.duration>=11));await page.locator('#choices button').nth(2).click();await page.getByRole('button',{name:'Pausar jornada',exact:true}).click();await page.reload({waitUntil:'networkidle'});await page.getByRole('button',{name:'Retomar meu percurso',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#phaseCount').textContent.includes('FASE 2'));for(let i=1;i<6;i++){await page.locator('#choices button').nth(2).click();if(i<5)await page.waitForFunction(n=>document.querySelector('#phaseCount').textContent.includes('FASE '+n),i+2);else await page.waitForFunction(()=>!document.querySelector('#results').classList.contains('hidden'))}assert.equal(await page.locator('#firstScore').textContent(),'0.0');await page.getByRole('button',{name:/Revisitar outros caminhos/}).click();for(let i=0;i<6;i++){await page.locator('#choices button').first().click();if(i<5)await page.waitForFunction(n=>document.querySelector('#phaseCount').textContent.includes('FASE '+n),i+2);else await page.waitForFunction(()=>document.querySelector('#currentScore').textContent==='100.0')}assert.equal(await page.locator('#firstScore').textContent(),'0.0');await page.waitForFunction(()=>document.querySelector('#percentile').textContent==='P0');assert.equal(await page.locator('.phase-row').count(),6);await page.selectOption('#scope','A');await page.waitForFunction(()=>document.querySelector('#cohortText').textContent.includes('12'));const download=page.waitForEvent('download');await page.getByRole('button',{name:'Baixar minha síntese',exact:true}).click();assert.equal((await download).suggestedFilename(),'tuuvo-minha-sintese.txt');await page.screenshot({path:process.env.ALPHA_SCREENSHOT||'/tmp/alpha-browser/alpha-publicada.png',fullPage:true});await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.getByRole('button',{name:/Apagar meus percursos/}).click();await page.screenshot({path:process.env.ALPHA_MOBILE_SCREENSHOT||'/tmp/alpha-browser/alpha-mobile.png',fullPage:true});assert.deepEqual(errors,[]);console.log('PASS: video, six phases, resume, two distinct attempts, benchmark, report download, mobile and no JS errors')}finally{await browser.close()}})().catch(e=>{console.error(e.message);process.exit(1)});
