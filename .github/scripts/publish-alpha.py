@@ -1,5 +1,5 @@
 import os,sys,json,re,subprocess,tempfile,pathlib,time,urllib.request,hashlib,tarfile,shutil
-SHA='5e6f96c91287b9b05b8b15c4a23a88b88bd7d207'
+SHA='e155f40adb95b65b1b1943a15df0d9a6d14d077e'
 APP='coonto-corporate-alpha'
 NETWORK='corporate_alpha_internal'
 TARGET='tuuvo.app.br'
@@ -150,7 +150,7 @@ try:
     run('docker','run','-d','--restart','unless-stopped','--name',APP,'--network',NETWORK,image)
     started=True
     STAGE='E10'
-    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.6')throw Error('wrong service')}).catch(()=>process.exit(1))"
+    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.7')throw Error('wrong service')}).catch(()=>process.exit(1))"
     for attempt in range(20):
         p=subprocess.run(['docker','exec',APP,'node','-e',health_script],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if p.returncode==0:break
@@ -168,7 +168,7 @@ try:
             with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=10) as r:
                 if r.status!=200:raise RuntimeError('Public HTTP health failed')
                 d=json.load(r)
-                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.6':raise RuntimeError('Public host returned wrong service')
+                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.7':raise RuntimeError('Public host returned wrong service')
             break
         except Exception:
             if attempt==19:raise
@@ -176,7 +176,7 @@ try:
     STAGE='E14'
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
         if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
-    print('PUBLISHED: Alpha 0.1.0-alpha.6; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
+    print('PUBLISHED: Alpha 0.1.0-alpha.7; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
 except BaseException:
     failure_stage=STAGE
     STAGE='E15'
