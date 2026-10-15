@@ -51,7 +51,7 @@ jobs:
       - name: Prepare the exact validated Alpha source
         run: |
           set -euo pipefail
-          git archive e155f40adb95b65b1b1943a15df0d9a6d14d077e > /tmp/alpha.tar
+          git archive bc2b407f24a9ebe574d0e97187004a4a0de4e5b2 > /tmp/alpha.tar
           gzip /tmp/alpha.tar
       - name: Publish Alpha with verified routing and rollback
         id: deploy
