@@ -2,7 +2,7 @@ import {phases,corporateMaterials} from './corporate.js';
 import {medicalPhases,medicalMaterials,medicalContext} from './medical.js';
 import * as legacy from './legacy-engine.js';
 export {phases};
-export const VERSION='0.1.0-alpha.7';
+export const VERSION='0.1.0-alpha.8';
 export const experiences=[{id:'corporate',version:'2',title:'Uma conversa, muitos caminhos',phases:6},{id:'medical',version:'2',title:'Uma consulta, uma pessoa',phases:7}];
 function checkEdition(edition){if(!['1','2'].includes(edition))throw Error('invalid_edition');}
 function scenario(experience){if(!experiences.some(e=>e.id===experience))throw Error('invalid_experience');return experience==='medical'?medicalPhases:phases;}

@@ -18,3 +18,11 @@ Os materiais são documentos simulados em HTML acessível, com um diagrama SVG o
 A edição anterior mantém seu roteiro, sua rubrica e seus arquivos de armazenamento. A interface permite abri-la quando houver registros anteriores. A edição 2 usa chaves novas e não mistura tentativas nem comparações com a edição 1. A API aceita o identificador da edição; pedidos de clientes antigos sem edição continuam usando a edição 1.
 
 Os pesos continuam experimentais; os grupos de referência são fictícios. O caso médico permanece pendente de revisão docente e não certifica habilidade clínica. Os testes verificam a consistência entre escolhas, documentos, agenda e relatório; não demonstram que a revisão já melhorou a compreensão de pessoas reais. Essa avaliação deve ocorrer na próxima rodada com os convidados.
+
+## Revisão de linguagem · Alpha 0.1.0-alpha.8
+
+Após nova observação do responsável pelo produto, a revisão passou a cobrir a linguagem de toda a edição prática: apresentação, situações, tarefas, alternativas, quadros, comentários após as escolhas, resumo final e arquivo baixado.
+
+Exemplos: “preceptora” passa a ser “médica que acompanha seu atendimento”; “prontuário” vira “ficha de atendimento”; “logística” vira “equipe de entregas”; “janela de entrega” vira “horário de entrega”; “canhoto” vira “comprovante assinado por quem receber”; “benchmark” vira “comparação com exemplos”; “síntese” vira “resumo”. Siglas como RH saem das instruções. O papel da médica é explicado na apresentação do caso e na primeira etapa.
+
+A pontuação, as ações avaliadas, os identificadores e a separação dos históricos permanecem os mesmos da edição prática 2. A edição 1 continua preservada como registro histórico. Títulos de capítulos e da obra nas referências mantêm a identificação da fonte. A próxima leitura com os convidados deve avaliar a compreensão: passar nos testes do sistema não comprova que todas as pessoas entenderão o texto.
