@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run view 38752280403 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
+          gh run view 38812678026 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
           python3 - <<'PY'
           import os
           text=open('/tmp/private-run-log').read()
@@ -26,13 +26,14 @@ jobs:
           lines=text.splitlines()
           candidates=[]
           for line in lines:
-              for marker in ['RuntimeError:', 'PermissionError:', 'FileNotFoundError:', 'OSError:', 'locator.click:', 'page.goto:', 'page.waitForFunction:', 'browserType.launch:', 'Expected values to be strictly equal', 'NotSupportedError', 'The expression evaluated to a falsy value']:
+              for marker in ['AssertionError:', 'CalledProcessError:', 'TypeError:', 'KeyError:', 'ValueError:', 'urllib.error.HTTPError:', 'RuntimeError:', 'PermissionError:', 'FileNotFoundError:', 'OSError:', 'locator.click:', 'page.goto:', 'page.waitForFunction:', 'browserType.launch:', 'Expected values to be strictly equal', 'NotSupportedError', 'The expression evaluated to a falsy value']:
                   if marker in line:
                       message=line[line.index(marker):]
                       candidates.append(message[:500])
           for line in lines:
               if 'waiting for ' in line and ('getByRole' in line or 'locator(' in line):
                   candidates.append(line[line.index('waiting for '):][:350])
+          for candidate in candidates: print('::notice title=Coonto brochure failure diagnosis::'+candidate.replace('%','%25'))
           codes=[code for marker,code in [('Connection timed out','SSH_TIMEOUT'),('Connection refused','SSH_REFUSED'),('No route to host','SSH_NO_ROUTE'),('Permission denied','SSH_AUTH'),('Host key verification failed','SSH_HOST_KEY'),('REMOTE HOST IDENTIFICATION HAS CHANGED','SSH_HOST_CHANGED'),('Connection reset','SSH_RESET'),('Connection closed','SSH_CLOSED')] if marker.lower() in text.lower()];message=' | '.join(codes) or 'NO_CLASSIFIED_SSH_ERROR'
           print('::notice title=Public browser first-run diagnosis::'+message)
           with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('codes='+('_'.join(codes) if codes else 'UNCLASSIFIED')+'\n')
