@@ -57,7 +57,7 @@ jobs:
           def visit(x):
               if isinstance(x,dict):
                   hosts=[h for m in x.get('match',[]) for h in m.get('host',[])]
-                  if 'coonto.com' in hosts or 'dev.coonto.com' in hosts:notice({'routing':x})
+                  if 'coonto.com' in hosts or 'dev.coonto.com' in hosts:notice({'routing_hosts':hosts})
                   for v in x.values():visit(v)
               elif isinstance(x,list):
                   for v in x:visit(v)
@@ -67,3 +67,9 @@ jobs:
               if p.exists():
                   f=p/'app/para-educadores/page.tsx';notice({'source_root':root,'educator_source_exists':f.exists(),'package':json.loads((p/'package.json').read_text()).get('version') if (p/'package.json').exists() else '', 'educator_source_sha':__import__('hashlib').sha256(f.read_bytes()).hexdigest() if f.exists() else ''})
           PY
+          mounts=json.loads(subprocess.check_output(['docker','inspect','caddy_global'],text=True))[0]['Mounts']
+          notice({'proxy_mounts':[{'src':m['Source'],'dst':m['Destination'],'rw':m.get('RW')} for m in mounts]})
+          for f in ['/opt/coonto/prod/index.html']:
+              data=subprocess.check_output(['docker','exec','caddy_global','cat',f],text=True)
+              notice({'static_index':f,'html':data[:10000]})
+          notice({'static_files':subprocess.check_output(['docker','exec','caddy_global','ls','-la','/opt/coonto/prod'],text=True)})
