@@ -1,0 +1,73 @@
+name: Diagnose public Coonto loading
+on:
+  push:
+    branches: [feature/jornada-multimidia]
+    paths: [.github/workflows/coonto-loading-check.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check public DNS and pages from outside the VPS
+        run: |
+          python3 - <<'PYNET'
+          import urllib.request,urllib.error,socket,json,concurrent.futures
+          def probe(url):
+              try:
+                  with urllib.request.urlopen(url,timeout=25) as r:
+                      b=r.read();return {'url':url,'status':r.status,'final':r.url,'type':r.headers.get('Content-Type'),'bytes':len(b),'pdf':b.startswith(b'%PDF-'),'educators':b'Para educadores e institui' in b,'entry':b'coonto-educadores-access' in b}
+              except Exception as e:return {'url':url,'error':type(e).__name__+': '+str(e)}
+          urls=['https://coonto.com/','https://coonto.com/para-educadores.html','https://coonto.com/materiais/coonto-educacao-parcerias.pdf','https://www.coonto.com/','https://dev.coonto.com/','https://tuuvo.app.br/api/health']
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+              for d in pool.map(probe,urls):print('::notice title=Coonto public loading::'+json.dumps(d))
+          for host in ['coonto.com','www.coonto.com','dev.coonto.com']:
+              try:print('::notice title=Coonto DNS::'+json.dumps({'host':host,'addresses':sorted(set(x[4][0] for x in socket.getaddrinfo(host,443)))}))
+              except Exception as e:print('::notice title=Coonto DNS::'+host+': '+str(e))
+          PYNET
+      - name: Verify SSH configuration and audited host identity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'Missing SSH_PRIVATE_KEY'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'Missing SERVER_HOST'; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 20 "$SERVER_HOST" > /tmp/host-keys 2>/dev/null
+          matched=0
+          while IFS= read -r key; do
+            printf '%s\n' "$key" > /tmp/one-host-key
+            fingerprint=$(ssh-keygen -lf /tmp/one-host-key | awk '{print $2}')
+            if [ "$fingerprint" = 'SHA256:krCrd5JK0ES+IzHRuIdHDMqrsoEUsh2UWKz0tJ9YZ0Y' ]; then
+              cat /tmp/one-host-key >> ~/.ssh/known_hosts
+              matched=1
+            fi
+          done < /tmp/host-keys
+          test "$matched" = 1 || { echo 'Audited VPS host identity mismatch'; exit 1; }
+      - name: Inspect static files and current host routes without changes
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes "${SERVER_USER}@${SERVER_HOST}" 'sudo -n python3 -' <<'PY'
+          import subprocess,json,pathlib,hashlib
+          def note(x):print('::notice title=Coonto host loading::'+json.dumps(x))
+          for f in ['index.html','para-educadores.html','materiais/coonto-educacao-parcerias.pdf']:
+              p=pathlib.Path('/opt/coonto/prod')/f
+              note({'file':f,'exists':p.exists(),'bytes':p.stat().st_size if p.exists() else None,'sha256':hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None})
+          note({'proxy':subprocess.check_output(['docker','inspect','caddy_global','--format','{{.State.Status}}'],text=True).strip()})
+          c=json.loads(subprocess.check_output(['docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile'],text=True,stderr=subprocess.DEVNULL))
+          def visit(x):
+              if isinstance(x,dict):
+                  hosts=[h for m in x.get('match',[]) for h in m.get('host',[])]
+                  if any(h in hosts for h in ['coonto.com','www.coonto.com']):note({'route':x})
+                  for v in x.values():visit(v)
+              elif isinstance(x,list):
+                  for v in x:visit(v)
+          visit(c)
+          PY
