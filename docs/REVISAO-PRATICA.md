@@ -26,3 +26,17 @@ Após nova observação do responsável pelo produto, a revisão passou a cobrir
 Exemplos: “preceptora” passa a ser “médica que acompanha seu atendimento”; “prontuário” vira “ficha de atendimento”; “logística” vira “equipe de entregas”; “janela de entrega” vira “horário de entrega”; “canhoto” vira “comprovante assinado por quem receber”; “benchmark” vira “comparação com exemplos”; “síntese” vira “resumo”. Siglas como RH saem das instruções. O papel da médica é explicado na apresentação do caso e na primeira etapa.
 
 A pontuação, as ações avaliadas, os identificadores e a separação dos históricos permanecem os mesmos da edição prática 2. A edição 1 continua preservada como registro histórico. Títulos de capítulos e da obra nas referências mantêm a identificação da fonte. A próxima leitura com os convidados deve avaliar a compreensão: passar nos testes do sistema não comprova que todas as pessoas entenderão o texto.
+
+## Correção de fluxo e layout · Alpha 0.1.0-alpha.9
+
+A reorganização atende ao relato de confusão ao explicar e usar a demonstração. Não acrescenta casos nem modifica alternativas ou pontuação.
+
+- A apresentação explica o funcionamento e dá prioridade a começar, continuar uma tentativa ou abrir o resumo, conforme o histórico. Áudio, versões anteriores e informações sobre o manual ficam em seções opcionais.
+- A etapa tem uma sequência visual única: situação, informações e resposta. As alternativas deixam de competir com os documentos em uma coluna lateral. A indicação de progresso aparece uma vez no topo.
+- Marcar uma alternativa não envia a resposta. O participante confirma no botão “Confirmar escolha”. Uma tela separada mostra a ação escolhida e seu resultado; “Ir para a etapa N” permite avançar conscientemente. O retorno da etapa anterior deixa de aparecer antes da próxima situação.
+- O resumo abre com a leitura das escolhas e ações claras. Pontos, comparação inventada, detalhes de cada etapa e gerenciamento do histórico ficam acessíveis em seções que o participante abre quando quiser.
+- A folha de estilos foi reorganizada para eliminar camadas sucessivas de ajustes concorrentes. O mesmo fluxo linear vale para computador e celular.
+
+A confirmação salva imediatamente a escolha, incluindo a informação de que o retorno ainda precisa ser lido. Após pausa, troca de caso ou recarga, a retomada abre esse retorno. A última tentativa só é concluída quando o participante escolhe ver o resumo, evitando duplicações após recarga. O retorno pendente é reconstruído a partir das respostas verificadas pela API, e não de texto arbitrário no armazenamento local.
+
+A verificação de navegador cobre seleção sem envio, erro na confirmação com nova tentativa, retorno separado, recarga durante retorno e antes do resumo final, preservação de tentativas e versões anteriores, áudio, exportação e telas de computador e celular. A avaliação de clareza por pessoas continua sendo necessária após a revisão.
