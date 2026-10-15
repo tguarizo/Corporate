@@ -7,7 +7,7 @@ import {resolveStep,initialState,resumeState,VERSION,benchmark,experiences} from
 const root=path.dirname(fileURLToPath(import.meta.url));
 const security={'X-Content-Type-Options':'nosniff','Cache-Control':'no-store'};
 const send=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8',...security});res.end(JSON.stringify(obj));};
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.mp4':'video/mp4','.vtt':'text/vtt; charset=utf-8'};
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.mp4':'video/mp4','.vtt':'text/vtt; charset=utf-8','.pdf':'application/pdf'};
 const server=http.createServer(async(req,res)=>{try{
  const url=new URL(req.url,'http://localhost');
  if(req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{status:'ok',service:'coonto-corporate',version:VERSION});
@@ -22,10 +22,12 @@ const server=http.createServer(async(req,res)=>{try{
  let file;
  if(['/','/experience','/coonto'].includes(url.pathname))file='index.html';
  else if(['/app.js','/materials.js','/styles.css'].includes(url.pathname))file=url.pathname.slice(1);
+ else if(url.pathname==='/materiais/coonto-educacao-parcerias.pdf')file='materiais/coonto-educacao-parcerias.pdf';
  else if(/^\/assets\/[a-z0-9-]+\.(svg|png|mp4|vtt)$/.test(url.pathname))file=url.pathname.slice(1);
  if(file&&['GET','HEAD'].includes(req.method)){
   const full=path.join(root,'public',file);let info;try{info=await stat(full)}catch{return send(res,404,{error:'not_found'})}
   const headers={...security,'Content-Type':mime[path.extname(file)],'Accept-Ranges':'bytes','Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; media-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"};
+  if(file==='materiais/coonto-educacao-parcerias.pdf')headers['Content-Disposition']='attachment; filename="Coonto-Educacao-Parcerias.pdf"';
   let start=0,end=info.size-1,status=200;
   if(req.headers.range){const m=/^bytes=(\d*)-(\d*)$/.exec(req.headers.range);if(!m||(!m[1]&&!m[2]))return send(res,416,{error:'invalid_range'});if(!m[1]){start=Math.max(0,info.size-Number(m[2]));}else{start=Number(m[1]);if(m[2])end=Math.min(Number(m[2]),end);}if(start>end||start>=info.size){res.writeHead(416,{'Content-Range':`bytes */${info.size}`});return res.end()}status=206;headers['Content-Range']=`bytes ${start}-${end}/${info.size}`;}
   headers['Content-Length']=end-start+1;res.writeHead(status,headers);if(req.method==='HEAD')return res.end();const stream=createReadStream(full,{start,end});stream.on('error',()=>res.destroy());stream.pipe(res);return;
