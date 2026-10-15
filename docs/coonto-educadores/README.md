@@ -2,7 +2,7 @@
 
 Fonte editorial: `tguarizo/dev.coonto.com`, branch `feature/apresentacao-educadores`, commit `eda2a42`. O diretório `site/` preserva os arquivos dessa publicação para o fluxo com acesso já configurado à VPS.
 
-- Página institucional: https://coonto.com/para-educadores/
+- Página institucional: https://coonto.com/para-educadores.html
 - PDF: https://coonto.com/materiais/coonto-educacao-parcerias.pdf
 - Experiência interativa: https://dev.coonto.com
 

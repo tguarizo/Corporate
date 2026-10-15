@@ -1,4 +1,5 @@
 name: Publish Coonto educator presentation
+# Use a directly served HTML page on the existing static production host.
 on:
   push:
     branches: [feature/jornada-multimidia]

@@ -12,8 +12,8 @@ const crypto=require('node:crypto');
   if(!process.env.PRESENTATION_SKIP_HOME){
    assert.equal((await page.goto(base+'/',{waitUntil:'domcontentloaded'})).status(),200);
    await page.locator('#coonto-educadores-access a').click();
-   await page.waitForURL(base+'/para-educadores/');
-  }else await page.goto(base+'/para-educadores/');
+   await page.waitForURL(base+'/para-educadores.html');
+  }else await page.goto(base+'/para-educadores.html');
   await page.getByRole('heading',{level:1,name:/Leve o Coonto/}).waitFor();
   await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));
   assert.equal(await page.title(),'Para educadores e instituições | Coonto');

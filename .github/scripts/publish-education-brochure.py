@@ -1,7 +1,7 @@
 """Publish only the educator landing page, brochure, artwork and home entry link."""
 import hashlib,json,os,pathlib,re,shutil,subprocess,sys,tarfile,tempfile,time,urllib.request
 
-ALLOWED={'para-educadores/index.html','materiais/coonto-educacao-parcerias.pdf','materiais/coonto-logo.png','materiais/coonto-icon.png','materiais/coonto-apresentacao-capa.png'}
+ALLOWED={'para-educadores.html','materiais/coonto-educacao-parcerias.pdf','materiais/coonto-logo.png','materiais/coonto-icon.png','materiais/coonto-apresentacao-capa.png'}
 def run(*args):return subprocess.check_output(args,text=True,stderr=subprocess.DEVNULL)
 def notice(message):print('::notice title=Coonto presentation publication::'+message,flush=True)
 def fetch(path):
@@ -50,9 +50,9 @@ def main():
     original=home.read_bytes();owner=(home.stat().st_uid,home.stat().st_gid)
     text=original.decode('utf-8');assert '<div id="app"></div>' in text,'Unexpected production entry'
     marker='coonto-educadores-access'
-    fragment='\n<nav id="coonto-educadores-access" aria-label="Educadores e instituições" style="display:block;box-sizing:border-box;padding:12px 18px;text-align:center;background:#101c36;border-bottom:1px solid #34456a;font:14px/1.5 system-ui,sans-serif"><a href="/para-educadores/" style="display:inline-block;color:#eef2ff;text-decoration:underline;text-underline-offset:3px">Para educadores e instituições · Conheça o Coonto e baixe a apresentação →</a></nav>\n'
+    fragment='\n<nav id="coonto-educadores-access" aria-label="Educadores e instituições" style="display:block;box-sizing:border-box;padding:12px 18px;text-align:center;background:#101c36;border-bottom:1px solid #34456a;font:14px/1.5 system-ui,sans-serif"><a href="/para-educadores.html" style="display:inline-block;color:#eef2ff;text-decoration:underline;text-underline-offset:3px">Para educadores e instituições · Conheça o Coonto e baixe a apresentação →</a></nav>\n'
     if marker in text:
-        assert text.count(marker)==1 and 'href="/para-educadores/"' in text
+        assert text.count(marker)==1 and 'href="/para-educadores.html"' in text
         updated=original
     else:
         assert len(re.findall(r'<body\b[^>]*>',text,re.I))==1
@@ -68,7 +68,7 @@ def main():
             files[name]=archive.extractfile(member).read()
     assert set(files)==ALLOWED,'Incomplete brochure package'
     pdf=files['materiais/coonto-educacao-parcerias.pdf'];assert pdf.startswith(b'%PDF-')
-    page=files['para-educadores/index.html'];assert b'Coonto-Educacao-Parcerias.pdf' in page and b'dev.coonto.com' in page
+    page=files['para-educadores.html'];assert b'Coonto-Educacao-Parcerias.pdf' in page and b'dev.coonto.com' in page
     targets={root/name:data for name,data in files.items()};targets[home]=updated
     before={}
     for path in targets:
@@ -76,7 +76,7 @@ def main():
         if path.exists():
             assert path.is_file()
             before[path]=(path.read_bytes(),path.stat().st_mode&0o777,(path.stat().st_uid,path.stat().st_gid))
-            if path.name=='index.html' and path!=home:assert b'coonto-educacao-parcerias.pdf' in before[path][0],'Existing page is not ours'
+            if path==root/'para-educadores.html':assert b'coonto-educacao-parcerias.pdf' in before[path][0],'Existing page is not ours'
         else:before[path]=None
     backup=pathlib.Path('/var/backups/coonto-educadores')/(time.strftime('%Y%m%dT%H%M%SZ',time.gmtime())+'-'+str(os.getpid()))
     backup.mkdir(parents=True,mode=0o700)
@@ -88,11 +88,11 @@ def main():
         assert home.read_bytes()==updated
         status,headers,body=fetch('/materiais/coonto-educacao-parcerias.pdf')
         assert status==200 and headers.get_content_type()=='application/pdf' and body==pdf,'Public PDF validation failed'
-        status,headers,body=fetch('/para-educadores/')
+        status,headers,body=fetch('/para-educadores.html')
         assert status==200 and 'Para educadores e instituições | Coonto' in body.decode() and b'download="Coonto-Educacao-Parcerias.pdf"' in body,'Public educator page validation failed'
         status,headers,body=fetch('/')
         assert status==200 and marker.encode() in body and b'src="app.js"' in body,'Home entry link validation failed'
-        notice('Published https://coonto.com/para-educadores/ and the four-page PDF; home entry link verified; existing experience files and proxy configuration preserved.')
+        notice('Published https://coonto.com/para-educadores.html and the four-page PDF; home entry link verified; existing experience files and proxy configuration preserved.')
         notice('PDF SHA256='+hashlib.sha256(pdf).hexdigest())
     except BaseException:
         for path,prior in before.items():
@@ -100,4 +100,8 @@ def main():
             elif path.exists():path.unlink()
         raise
 
+def explain_failure(typ,value,tb):
+    print('::error title=Coonto presentation publication::'+typ.__name__+': '+str(value).replace('\n',' '),flush=True)
+    sys.__excepthook__(typ,value,tb)
+sys.excepthook=explain_failure
 if __name__=='__main__':main()
