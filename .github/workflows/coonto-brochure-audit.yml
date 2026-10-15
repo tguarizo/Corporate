@@ -41,6 +41,12 @@ jobs:
           ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes "${SERVER_USER}@${SERVER_HOST}" 'sudo -n python3 -' <<'PY'
           import urllib.request,json,subprocess,pathlib,re
           def notice(data):print('::notice title=Coonto brochure target::'+json.dumps(data,ensure_ascii=False))
+          mounts=json.loads(subprocess.check_output(['docker','inspect','caddy_global'],text=True))[0]['Mounts']
+          notice({'proxy_mounts':[{'src':m['Source'],'dst':m['Destination'],'rw':m.get('RW')} for m in mounts]})
+          for f in ['/opt/coonto/prod/index.html']:
+              data=subprocess.check_output(['docker','exec','caddy_global','cat',f],text=True)
+              notice({'static_index':f,'html':data[:10000]})
+          notice({'static_files':subprocess.check_output(['docker','exec','caddy_global','ls','-la','/opt/coonto/prod'],text=True)})
           for host in ['coonto.com','dev.coonto.com']:
               for path in ['/','/para-educadores','/api/health']:
                   try:
@@ -66,10 +72,4 @@ jobs:
               p=pathlib.Path(root)
               if p.exists():
                   f=p/'app/para-educadores/page.tsx';notice({'source_root':root,'educator_source_exists':f.exists(),'package':json.loads((p/'package.json').read_text()).get('version') if (p/'package.json').exists() else '', 'educator_source_sha':__import__('hashlib').sha256(f.read_bytes()).hexdigest() if f.exists() else ''})
-          mounts=json.loads(subprocess.check_output(['docker','inspect','caddy_global'],text=True))[0]['Mounts']
-          notice({'proxy_mounts':[{'src':m['Source'],'dst':m['Destination'],'rw':m.get('RW')} for m in mounts]})
-          for f in ['/opt/coonto/prod/index.html']:
-              data=subprocess.check_output(['docker','exec','caddy_global','cat',f],text=True)
-              notice({'static_index':f,'html':data[:10000]})
-          notice({'static_files':subprocess.check_output(['docker','exec','caddy_global','ls','-la','/opt/coonto/prod'],text=True)})
           PY
