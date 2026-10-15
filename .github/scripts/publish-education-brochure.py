@@ -1,7 +1,7 @@
-"""Publish only the educator landing page, brochure, artwork and home entry link."""
+"""Publish only the educator landing page, brochure, artwork and the institutional homepage."""
 import hashlib,json,os,pathlib,re,shutil,subprocess,sys,tarfile,tempfile,time,urllib.request
 
-ALLOWED={'para-educadores.html','materiais/coonto-educacao-parcerias.pdf','materiais/coonto-logo.png','materiais/coonto-icon.png','materiais/coonto-apresentacao-capa.png'}
+ALLOWED={'index.html','para-educadores.html','materiais/coonto-educacao-parcerias.pdf','materiais/coonto-logo.png','materiais/coonto-icon.png','materiais/coonto-apresentacao-capa.png'}
 def run(*args):return subprocess.check_output(args,text=True,stderr=subprocess.DEVNULL)
 def notice(message):print('::notice title=Coonto presentation publication::'+message,flush=True)
 def fetch(path):
@@ -48,16 +48,7 @@ def main():
     root=(pathlib.Path(mount['Source'])/inside.relative_to(mount['Destination'])).resolve()
     home=root/'index.html';assert home.is_file() and not home.is_symlink(),'Missing production home'
     original=home.read_bytes();owner=(home.stat().st_uid,home.stat().st_gid)
-    text=original.decode('utf-8');assert '<div id="app"></div>' in text,'Unexpected production entry'
-    marker='coonto-educadores-access'
-    fragment='\n<nav id="coonto-educadores-access" aria-label="Educadores e instituições" style="display:block;box-sizing:border-box;padding:12px 18px;text-align:center;background:#101c36;border-bottom:1px solid #34456a;font:14px/1.5 system-ui,sans-serif"><a href="/para-educadores.html" style="display:inline-block;color:#eef2ff;text-decoration:underline;text-underline-offset:3px">Para educadores e instituições · Conheça o Coonto e baixe a apresentação →</a></nav>\n'
-    if marker in text:
-        assert text.count(marker)==1 and 'href="/para-educadores.html"' in text
-        updated=original
-    else:
-        assert len(re.findall(r'<body\b[^>]*>',text,re.I))==1
-        updated=re.sub(r'(<body\b[^>]*>)',lambda m:m.group(1)+fragment,text,count=1,flags=re.I).encode()
-        assert updated.decode().replace(fragment,'',1)==text
+    assert b'<div id="app"></div>' in original or b'id="coonto-home"' in original,'Unexpected production entry'
     files={}
     with tarfile.open(sys.argv[1],'r:gz') as archive:
         for member in archive.getmembers():
@@ -69,7 +60,8 @@ def main():
     assert set(files)==ALLOWED,'Incomplete brochure package'
     pdf=files['materiais/coonto-educacao-parcerias.pdf'];assert pdf.startswith(b'%PDF-')
     page=files['para-educadores.html'];assert b'Coonto-Educacao-Parcerias.pdf' in page and b'dev.coonto.com' in page
-    targets={root/name:data for name,data in files.items()};targets[home]=updated
+    updated=files['index.html'];assert b'id="coonto-home"' in updated and b'https://dev.coonto.com' in updated,'Invalid homepage'
+    targets={root/name:data for name,data in files.items()}
     before={}
     for path in targets:
         assert path.resolve().is_relative_to(root) and not path.is_symlink(),'Unsafe target'
@@ -91,8 +83,8 @@ def main():
         status,headers,body=fetch('/para-educadores.html')
         assert status==200 and 'Para educadores e instituições | Coonto' in body.decode() and b'download="Coonto-Educacao-Parcerias.pdf"' in body,'Public educator page validation failed'
         status,headers,body=fetch('/')
-        assert status==200 and marker.encode() in body and b'src="app.js"' in body,'Home entry link validation failed'
-        notice('Published https://coonto.com/para-educadores.html and the four-page PDF; home entry link verified; existing experience files and proxy configuration preserved.')
+        assert status==200 and body==updated and b'id="coonto-home"' in body,'Public homepage validation failed'
+        notice('Published https://coonto.com/ with the new homepage, experience CTA, PDF and educator page; existing application assets, data and proxy configuration preserved.')
         notice('PDF SHA256='+hashlib.sha256(pdf).hexdigest())
     except BaseException:
         for path,prior in before.items():

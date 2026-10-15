@@ -1,5 +1,5 @@
-name: Publish Coonto educator presentation
-# Use a directly served HTML page on the existing static production host.
+name: Publish Coonto homepage and educator presentation
+# Publish the approved institutional homepage on the existing static host.
 on:
   push:
     branches: [feature/jornada-multimidia]
@@ -39,7 +39,7 @@ jobs:
             fi
           done < /tmp/host-keys
           test "$matched" = 1 || { echo 'Audited VPS host identity mismatch'; exit 1; }
-      - name: Publish only the educator page and presentation
+      - name: Publish the homepage, educator page and presentation
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
