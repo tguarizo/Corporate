@@ -81,6 +81,8 @@ jobs:
               print(json.dumps({'hosts':['proxy-start-config'],'upstreams':['expected' if '/etc/caddy/Caddyfile' in d.get('Args',[]) else 'different']}))
           p=subprocess.run(['sudo','-n','python3','-c','import os; assert os.geteuid()==0'],capture_output=True,text=True)
           print(json.dumps({'hosts':['sudo-status'],'upstreams':['ready' if p.returncode==0 else 'unavailable']}))
+          p=subprocess.run(['pgrep','-f',r'(^|/)python3 /tmp/corporate-alpha-publish\.[^/]+/publish.py '],capture_output=True,text=True)
+          print(json.dumps({'hosts':['publisher-process'],'upstreams':['active' if p.returncode==0 else 'idle']}))
           import urllib.request,urllib.error
           for label,url in [('institutional-health','https://tuuvo.com.br/health'),('education-health','https://dev.coonto.com/api/health')]:
               try:
@@ -101,7 +103,7 @@ jobs:
               except ValueError: continue
               if not isinstance(item,dict) or 'hosts' not in item: continue
               for host in item['hosts']:
-                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config','sudo-status','institutional-health','education-health']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config','sudo-status','institutional-health','education-health','publisher-process']:
                       dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
                       dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
                       parts.append(host+'='+dials)
