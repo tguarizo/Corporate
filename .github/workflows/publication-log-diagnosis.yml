@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run view 38812678026 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
+          gh run view 38980581572 --repo tguarizo/Corporate --log-failed > /tmp/private-run-log
           python3 - <<'PY'
           import os
           text=open('/tmp/private-run-log').read()
