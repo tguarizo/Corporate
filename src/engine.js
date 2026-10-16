@@ -2,7 +2,7 @@ import {phases,corporateMaterials} from './corporate.js';
 import {medicalPhases,medicalMaterials,medicalContext} from './medical.js';
 import * as legacy from './legacy-engine.js';
 export {phases};
-export const VERSION='0.1.0-alpha.10';
+export const VERSION='0.1.0-alpha.11';
 export const experiences=[{id:'corporate',version:'2',title:'Uma conversa, muitos caminhos',phases:6},{id:'medical',version:'2',title:'Uma consulta, uma pessoa',phases:7}];
 function checkEdition(edition){if(!['1','2'].includes(edition))throw Error('invalid_edition');}
 function scenario(experience){if(!experiences.some(e=>e.id===experience))throw Error('invalid_experience');return experience==='medical'?medicalPhases:phases;}
@@ -22,7 +22,7 @@ function stateFor(history,experience){
  const list=scenario(experience),h=validateHistory(history,experience),original=list[h.length];
  const phase=original?{...original,context:experience==='medical'?medicalContext(original,h):original.context,materials:materials(original,h,experience)}:null;
  const previous=h.length?list[h.length-1]:null,choice=previous?.choices.find(c=>c.id===h.at(-1).choice);
- return {version:VERSION,experience,experienceVersion:'2',history:h,finished:!phase,phase,index:h.length,totalPhases:list.length,report:!phase?scoreHistory(h,experience):null,previous:choice?choice.evidence+' '+choice.consequence:null,previousReference:previous?.reference||null};
+ return {version:VERSION,experience,experienceVersion:'2',history:h,finished:!phase,phase,index:h.length,totalPhases:list.length,report:!phase?scoreHistory(h,experience):null,previous:choice?choice.evidence+' '+choice.consequence:null,previousReference:previous?.reference||null,previousOutcome:choice?{observation:choice.evidence,consequence:choice.consequence}:null};
 }
 export function initialState(experience='corporate',edition='2'){checkEdition(edition);return edition==='1'?legacy.initialState(experience):stateFor([],experience);}
 export function resumeState(history,experience='corporate',edition='2'){checkEdition(edition);return edition==='1'?legacy.resumeState(history,experience):stateFor(history,experience);}

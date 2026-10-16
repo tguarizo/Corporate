@@ -3,3 +3,4 @@ node_modules/
 backups/
 *.tar.gz
 .DS_Store
+data/

@@ -4,7 +4,9 @@ import {createReadStream} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {resolveStep,initialState,resumeState,VERSION,benchmark,experiences} from './src/engine.js';
+import {createFeedbackStore} from './src/feedback.js';
 const root=path.dirname(fileURLToPath(import.meta.url));
+const feedbackStore=createFeedbackStore(process.env.FEEDBACK_DIR||path.join(root,'data','feedback'));
 const security={'X-Content-Type-Options':'nosniff','Cache-Control':'no-store'};
 const send=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8',...security});res.end(JSON.stringify(obj));};
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.mp4':'video/mp4','.vtt':'text/vtt; charset=utf-8','.pdf':'application/pdf'};
@@ -12,6 +14,13 @@ const server=http.createServer(async(req,res)=>{try{
  const url=new URL(req.url,'http://localhost');
  if(req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{status:'ok',service:'coonto-corporate',version:VERSION});
  if(req.method==='GET'&&url.pathname==='/api/experiences')return send(res,200,{experiences});
+ if(req.method==='POST'&&url.pathname==='/api/experience-feedback'){
+  if(!req.headers['content-type']?.startsWith('application/json'))return send(res,415,{error:'json_required'});
+  if(req.headers.origin){try{if(new URL(req.headers.origin).host!==req.headers.host)return send(res,403,{error:'invalid_origin'})}catch{return send(res,403,{error:'invalid_origin'})}}
+  req.setEncoding('utf8');let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8192)return send(res,413,{error:'too_large'});}
+  let body;try{body=JSON.parse(raw)}catch{return send(res,400,{error:'invalid_json'})}
+  try{return send(res,201,await feedbackStore.submit(body))}catch(error){return send(res,error.message==='invalid_feedback'?400:503,{error:error.message==='invalid_feedback'?'invalid_feedback':'feedback_unavailable'})}
+ }
  if(req.method==='GET'&&url.pathname==='/api/demo/start'){try{return send(res,200,initialState(url.searchParams.get('experience')||'corporate',url.searchParams.get('experienceVersion')||'1'))}catch{return send(res,400,{error:'invalid_experience'})}}
  if(req.method==='GET'&&url.pathname==='/api/demo/benchmark'){const score=Number(url.searchParams.get('score'));if(!Number.isFinite(score)||score<0||score>100)return send(res,400,{error:'invalid_score'});try{return send(res,200,benchmark(score,url.searchParams.get('scope')||'all',url.searchParams.get('experience')||'corporate',url.searchParams.get('experienceVersion')||'1'))}catch{return send(res,400,{error:'invalid_scope'})}}
  if(req.method==='POST'&&['/api/demo/step','/api/demo/resume'].includes(url.pathname)){

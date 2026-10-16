@@ -122,7 +122,7 @@ run('docker','exec','caddy_global','caddy','validate','--config','/tmp/corporate
 before=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'))
 after=json.loads(run('docker','exec','caddy_global','caddy','adapt','--config','/tmp/corporate-alpha-Caddyfile','--adapter','caddyfile'))
 STAGE='E04'
-for host in ['tuuvo.com.br','dev.coonto.com']:
+for host in ['tuuvo.com.br','dev.coonto.com','coonto.com','www.coonto.com']:
     if routes(before,host)!=routes(after,host):raise RuntimeError('Unrelated routing would change: '+host)
 if not routes(after,TARGET):raise RuntimeError('Alpha target missing from candidate config')
 image='coonto-corporate-alpha:'+SHA[:7]
@@ -138,6 +138,11 @@ if subprocess.run(['docker','network','inspect',NETWORK],stdout=subprocess.DEVNU
     run('docker','network','create',NETWORK)
 nets=json.loads(run('docker','inspect','caddy_global','--format','{{json .NetworkSettings.Networks}}'))
 if NETWORK not in nets:run('docker','network','connect',NETWORK,'caddy_global')
+feedback=base/'feedback'
+feedback.mkdir(exist_ok=True,mode=0o700)
+node_uid=int(run('docker','run','--rm',image,'id','-u').strip())
+node_gid=int(run('docker','run','--rm',image,'id','-g').strip())
+os.chown(feedback,node_uid,node_gid);os.chmod(feedback,0o700)
 old=None;started=False;changed=False
 try:
     STAGE='E08'
@@ -147,15 +152,16 @@ try:
         run('docker','stop',APP);run('docker','rename',APP,old)
         run('docker','network','disconnect',NETWORK,old)
     STAGE='E09'
-    run('docker','run','-d','--restart','unless-stopped','--name',APP,'--network',NETWORK,image)
+    run('docker','run','-d','--restart','unless-stopped','--name',APP,'--network',NETWORK,'--mount','type=bind,source='+str(feedback)+',target=/app/data/feedback','--env','FEEDBACK_DIR=/app/data/feedback',image)
     started=True
     STAGE='E10'
-    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.10')throw Error('wrong service')}).catch(()=>process.exit(1))"
+    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.11')throw Error('wrong service')}).catch(()=>process.exit(1))"
     for attempt in range(20):
         p=subprocess.run(['docker','exec',APP,'node','-e',health_script],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if p.returncode==0:break
         time.sleep(1)
     else:raise RuntimeError('Alpha readiness failed')
+    run('docker','exec',APP,'node','--input-type=module','-e',"import {writeFile,unlink} from 'node:fs/promises'; const p='/app/data/feedback/.readiness'; await writeFile(p,'ready',{mode:0o600,flush:true}); await unlink(p);")
     # Preserve the mounted inode: atomic replacement would leave Docker using the old file.
     STAGE='E11'
     changed=True
@@ -168,7 +174,7 @@ try:
             with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=10) as r:
                 if r.status!=200:raise RuntimeError('Public HTTP health failed')
                 d=json.load(r)
-                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.10':raise RuntimeError('Public host returned wrong service')
+                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.11':raise RuntimeError('Public host returned wrong service')
             break
         except Exception:
             if attempt==19:raise
@@ -176,7 +182,7 @@ try:
     STAGE='E14'
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
         if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
-    print('PUBLISHED: Alpha 0.1.0-alpha.10; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
+    print('PUBLISHED: Alpha 0.1.0-alpha.11; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
 except BaseException:
     failure_stage=STAGE
     STAGE='E15'
