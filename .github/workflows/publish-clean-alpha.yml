@@ -1,5 +1,5 @@
 name: Publish clean Corporate Alpha
-# Restore an absent Alpha host without changing other routes, then publish validated source.
+# Preserve existing static and app routes while publishing the validated focused journey.
 on:
   push:
     branches: [feature/jornada-multimidia]

@@ -6,6 +6,7 @@ TARGET='tuuvo.app.br'
 STAGE='E01'
 def safe_exception(typ,value,tb):
     print('DEPLOY_CODE='+STAGE,flush=True)
+    print('::error title=Alpha publication::'+str(value).replace('\n',' '),flush=True)
     sys.__excepthook__(typ,value,tb)
 sys.excepthook=safe_exception
 
@@ -55,6 +56,16 @@ def rewrite(text,allow_missing=False):
         revised=text[:labels[0].start()]+text[closing.end():]
     return revised.rstrip()+'\n\n'+TARGET+' {\n    reverse_proxy '+APP+':3000\n}\n'
 
+def comparable_handlers(value):
+    # Caddy adds the input Caddyfile path to file_server.hide during adaptation.
+    # The temporary validation file is the same configuration at another path.
+    if isinstance(value,list):return [comparable_handlers(v) for v in value]
+    if not isinstance(value,dict):return value
+    result={key:comparable_handlers(v) for key,v in value.items()}
+    if result.get('handler')=='file_server' and isinstance(result.get('hide'),list):
+        result['hide']=['/etc/caddy/Caddyfile' if item=='/tmp/corporate-alpha-Caddyfile' else item for item in result['hide']]
+    return result
+
 def routes(data,host):
     found=[]
     def visit(x):
@@ -62,7 +73,7 @@ def routes(data,host):
             hosts=[]
             for m in x.get('match',[]):
                 if isinstance(m,dict):hosts.extend(m.get('host',[]))
-            if host in hosts:found.append(x.get('handle',[]))
+            if host in hosts:found.append(comparable_handlers(x.get('handle',[])))
             for v in x.values():visit(v)
         elif isinstance(x,list):
             for v in x:visit(v)
@@ -83,7 +94,13 @@ if '--test-rewrite' in sys.argv:
     try:rewrite(TARGET+' { respond 200 }\n'+TARGET+' { respond 201 }',allow_missing=True)
     except RuntimeError:pass
     else:raise AssertionError('Duplicate sites must remain rejected')
-    print('PASS: shared, isolated and missing target handling preserves unrelated site blocks')
+    handler={'handler':'file_server','hide':['/etc/caddy/Caddyfile','private/*']}
+    candidate={'handler':'file_server','hide':['/tmp/corporate-alpha-Caddyfile','private/*']}
+    assert comparable_handlers(handler)==comparable_handlers(candidate)
+    changed={'handler':'file_server','hide':['/tmp/corporate-alpha-Caddyfile','private/*','other/*']}
+    assert comparable_handlers(handler)!=comparable_handlers(changed)
+    assert comparable_handlers({'handler':'reverse_proxy','upstreams':[{'dial':'one:3000'}]})!=comparable_handlers({'handler':'reverse_proxy','upstreams':[{'dial':'two:3000'}]})
+    print('PASS: shared, isolated and missing target handling; Caddy adapter metadata normalized while real static and proxy route differences stay detectable')
     sys.exit(0)
 
 archive=pathlib.Path(sys.argv[1]).resolve()
