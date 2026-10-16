@@ -35,7 +35,7 @@ Fluxo editorial para a próxima jornada:
 - API pública somente de escrita: `POST /api/experience-feedback`. Não há listagem pública.
 - Registro de comentários: `experience-feedback.jsonl`, no diretório indicado por `FEEDBACK_DIR`. Em desenvolvimento, o padrão é `data/feedback/`, ignorado pelo Git.
 - Na VPS, o publicador monta `/opt/coonto/corporate-alpha/feedback` em `/app/data/feedback`. O processo Node pode gravar; o arquivo usa permissão 0600. O diretório fica fora das releases e dos contêineres substituídos.
-- O fluxo privado **Review Coonto audience feedback** exporta os registros pelo acesso SSH já configurado e cria o artefato `coonto-audience-feedback`, com retenção de sete dias. Os textos não são impressos nos logs nem expostos pela aplicação. O acesso ao artefato segue as permissões do repositório.
+- O fluxo **Review Coonto audience feedback** só exporta por acionamento manual, com a chave pública RSA de quem fará a revisão. Como este repositório é público, o arquivo recebe criptografia AES-256-GCM, e a chave de conteúdo é protegida com RSA-OAEP-SHA256. O artefato `coonto-audience-feedback-encrypted` tem retenção de sete dias. Somente quem tem a chave privada correspondente pode ler os comentários; os textos não aparecem nos logs, nos artefatos em claro nem na aplicação. Não se deve enviar uma chave privada ao fluxo. O utilitário `.github/scripts/feedback-archive.cjs` permite descriptografar o arquivo localmente.
 - Retornos sobre linguagem são enviados à equipe. O plano pessoal do participante permanece somente no navegador e no arquivo que ele decide baixar.
 
 ## Validação

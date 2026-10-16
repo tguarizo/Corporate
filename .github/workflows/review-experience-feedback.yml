@@ -4,13 +4,20 @@ on:
     branches: [feature/jornada-multimidia]
     paths: [.github/workflows/review-experience-feedback.yml]
   workflow_dispatch:
+    inputs:
+      recipient_public_key:
+        description: 'RSA recipient public key, PEM encoded as base64; never a private key'
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
   review:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
       - name: Verify SSH configuration and audited host identity
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -39,6 +46,7 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
         run: |
           set -euo pipefail
+          umask 077
           mkdir -p /tmp/coonto-feedback-review
           ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes "${SERVER_USER}@${SERVER_HOST}" 'sudo -n python3 -' > /tmp/coonto-feedback-review/feedback.json <<'PY'
           import pathlib,json,datetime
@@ -56,10 +64,24 @@ jobs:
           import json,collections
           data=json.load(open('/tmp/coonto-feedback-review/feedback.json'))
           groups=collections.Counter(x['category'] for x in data['feedback'])
-          print('::notice title=Coonto audience feedback::'+str(len(data['feedback']))+' comment(s); categories: '+json.dumps(groups)+'; full text is only in the repository artifact, not the public application.')
+          print('::notice title=Coonto audience feedback::'+str(len(data['feedback']))+' comment(s); categories: '+json.dumps(groups)+'; comment text is encrypted for the recipient and is not included in logs.')
           PY
+      - name: Encrypt the export for the review recipient
+        env:
+          RECIPIENT_PUBLIC_KEY: ${{ inputs.recipient_public_key }}
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          const {encryptFeedback}=require('./.github/scripts/feedback-archive.cjs');
+          const file='/tmp/coonto-feedback-review/feedback.json';
+          const publicKey=Buffer.from(process.env.RECIPIENT_PUBLIC_KEY,'base64');
+          const archive=Buffer.from(JSON.stringify(encryptFeedback(fs.readFileSync(file),publicKey)));
+          fs.writeFileSync('/tmp/coonto-feedback-review/feedback.encrypted.json',archive,{mode:0o600});
+          fs.unlinkSync(file);
+          if(archive.length<=24000)console.log('::notice title=Encrypted Coonto feedback::'+archive.toString('base64'));
+          JS
       - uses: actions/upload-artifact@v4
         with:
-          name: coonto-audience-feedback
-          path: /tmp/coonto-feedback-review/feedback.json
+          name: coonto-audience-feedback-encrypted
+          path: /tmp/coonto-feedback-review/feedback.encrypted.json
           retention-days: 7
