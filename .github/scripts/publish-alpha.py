@@ -1,5 +1,5 @@
 import os,sys,json,re,subprocess,tempfile,pathlib,time,urllib.request,hashlib,tarfile,shutil
-SHA='b001412ec6c42270811734cb056209b615410a9b'
+SHA='903aeaa18fbab432edfd4717882d0972b31015db'
 APP='coonto-corporate-alpha'
 NETWORK='corporate_alpha_internal'
 TARGET='tuuvo.app.br'
