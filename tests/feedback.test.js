@@ -48,3 +48,8 @@ test('narrative feedback accepts only scenes from its own edition and excludes p
  const directory=await mkdtemp(path.join(tmpdir(),'coonto-story-feedback-'));
  try{const store=createFeedbackStore(directory),input={...payload(),experienceVersion:'3',phase:'portafechada',history:[{phase:'chegada',choice:'reservar'}]};await store.submit(input);const row=JSON.parse((await readFile(path.join(directory,'experience-feedback.jsonl'),'utf8')).trim());assert.equal(row.phase,'portafechada');assert.equal(row.history,undefined);await assert.rejects(store.submit({...input,phase:'entrada'}),/invalid_feedback/);await assert.rejects(store.submit({...input,experience:'medical'}),/invalid_feedback/);}finally{await rm(directory,{recursive:true,force:true})}
 });
+
+test('new story comments accept the new scenes and remain separate from earlier editions',async()=>{
+ const directory=await mkdtemp(path.join(tmpdir(),'coonto-v4-feedback-'));
+ try{const store=createFeedbackStore(directory);await store.submit({...payload(),experienceVersion:'4',phase:'caixas-fora'});const row=JSON.parse((await readFile(path.join(directory,'experience-feedback.jsonl'),'utf8')).trim());assert.equal(row.experienceVersion,'4');assert.equal(row.phase,'caixas-fora');await assert.rejects(store.submit({...payload(),experienceVersion:'3',phase:'caixas-fora'}),/invalid_feedback/);await assert.rejects(store.submit({...payload(),experienceVersion:'4',experience:'medical',phase:'med-preparo'}),/invalid_feedback/);}finally{await rm(directory,{recursive:true,force:true})}
+});

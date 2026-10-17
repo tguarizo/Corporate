@@ -1,3 +1,4 @@
+import {supervisionFor} from './src/supervision.js';
 import http from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
@@ -23,15 +24,16 @@ const server=http.createServer(async(req,res)=>{try{
  }
  if(req.method==='GET'&&url.pathname==='/api/demo/start'){try{return send(res,200,initialState(url.searchParams.get('experience')||'corporate',url.searchParams.get('experienceVersion')||'1'))}catch{return send(res,400,{error:'invalid_experience'})}}
  if(req.method==='GET'&&url.pathname==='/api/demo/benchmark'){const score=Number(url.searchParams.get('score'));if(!Number.isFinite(score)||score<0||score>100)return send(res,400,{error:'invalid_score'});try{return send(res,200,benchmark(score,url.searchParams.get('scope')||'all',url.searchParams.get('experience')||'corporate',url.searchParams.get('experienceVersion')||'1'))}catch{return send(res,400,{error:'invalid_scope'})}}
- if(req.method==='POST'&&['/api/demo/step','/api/demo/resume'].includes(url.pathname)){
+ if(req.method==='POST'&&['/api/demo/step','/api/demo/resume','/api/demo/supervision'].includes(url.pathname)){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8192)return send(res,413,{error:'too_large'});}
   let payload;try{payload=JSON.parse(raw)}catch{return send(res,400,{error:'invalid_json'})}
-  try{return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history,payload.experience||'corporate',payload.experienceVersion||'1'):resolveStep({...payload,experienceVersion:payload.experienceVersion||'1'}))}catch{return send(res,400,{error:'invalid_step'})}
+  try{if(url.pathname.endsWith('supervision')){if(payload.experience&&payload.experience!=='corporate')throw Error('invalid_experience');return send(res,200,supervisionFor(payload.history,payload.experienceVersion));}return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history,payload.experience||'corporate',payload.experienceVersion||'1'):resolveStep({...payload,experienceVersion:payload.experienceVersion||'1'}))}catch{return send(res,400,{error:'invalid_step'})}
  }
  let file;
  if(['/','/experience','/coonto'].includes(url.pathname))file='index.html';
  else if(url.pathname==='/marina')file='marina.html';
- else if(['/app.js','/materials.js','/styles.css','/marina.js','/marina.css'].includes(url.pathname))file=url.pathname.slice(1);
+ else if(url.pathname==='/supervisao')file='supervisao.html';
+ else if(['/app.js','/materials.js','/styles.css','/marina.js','/marina.css','/supervisao.js'].includes(url.pathname))file=url.pathname.slice(1);
  else if(url.pathname==='/materiais/coonto-educacao-parcerias.pdf')file='materiais/coonto-educacao-parcerias.pdf';
  else if(/^\/assets\/[a-z0-9-]+\.(svg|png|mp4|vtt)$/.test(url.pathname))file=url.pathname.slice(1);
  if(file&&['GET','HEAD'].includes(req.method)){
