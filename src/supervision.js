@@ -1,7 +1,12 @@
+import {anaSupervision} from './ana-supervision.js';
+import {anaState} from './ana.js';
+import {observedConditions,simulateBenchmark} from './benchmark-simulation.js';
 import {marinaState} from './marina.js';
 import {marinaStateV4} from './marina-v4.js';
 
-export function supervisionFor(history,edition='4'){
+export function supervisionFor(history,edition='4',experience='corporate',scope='all'){
+ if(experience==='medical'&&edition==='3'){const state=anaState(history);return {...anaSupervision(history),conditions:observedConditions(state),simulation:simulateBenchmark(state,scope)};}
+ if(experience!=='corporate')throw Error('invalid_experience');
  if(!['3','4'].includes(edition))throw Error('invalid_edition');
  const reconstruct=edition==='4'?marinaStateV4:marinaState,state=reconstruct(history);
  const timeline=state.trail.map((entry,i)=>{
@@ -19,5 +24,5 @@ export function supervisionFor(history,edition='4'){
  if(selected('reserva','cadastro'))observations.push({topic:'Confirmação de recebimento',evidence:'O motorista foi orientado a usar o telefone do cadastro; não havia recebedor combinado. A porta estava fechada na chegada.',question:'Por que um telefone cadastrado não assegurou o recebimento?',practice:'Ensaiar a confirmação de um recebedor antes de despachar uma entrega fora do horário de funcionamento.'});
  if(selected('reserva','deixar'))observations.push({topic:'Entrega e integridade dos materiais',evidence:'Foi autorizada a entrega na calçada sem recebedor. Neste caso, oito kits foram danificados pela chuva.',question:'Qual comprovação deveria existir antes de marcar uma entrega como concluída?',practice:'Rever o procedimento para ausência de recebedor, incluindo integridade dos volumes e responsabilidade pela guarda.'});
  if(selected('reclamacao','insistir'))observations.push({topic:'Resposta à contestação',evidence:'Mesmo após a reabertura pela gerência, a orientação foi manter o chamado fechado. Os kits continuaram no depósito.',question:'Como retomar a solução quando o registro interno é contestado por uma evidência?',practice:'Simular a reabertura de uma reclamação com divergência documental e combinar um responsável pela resolução.'});
- return {experience:'corporate',experienceVersion:edition,complete:state.finished,decisions:state.history.length,outcome:{title:state.scene.title,description:state.scene.text,facts:state.scene.facts},timeline,observations,limits:'Este registro descreve escolhas em um caso fictício. Não comprova competência profissional, intenção ou comportamento no trabalho. Pontos não observados neste percurso não devem ser tratados como falhas.'};
+ return {conditions:observedConditions(state),simulation:simulateBenchmark(state,scope),experience:'corporate',experienceVersion:edition,complete:state.finished,decisions:state.history.length,outcome:{title:state.scene.title,description:state.scene.text,facts:state.scene.facts},timeline,observations,limits:'Este registro descreve escolhas em um caso fictício. Não comprova competência profissional, intenção ou comportamento no trabalho. Pontos não observados neste percurso não devem ser tratados como falhas.'};
 }

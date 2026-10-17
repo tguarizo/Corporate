@@ -27,11 +27,12 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==='POST'&&['/api/demo/step','/api/demo/resume','/api/demo/supervision'].includes(url.pathname)){
   let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>8192)return send(res,413,{error:'too_large'});}
   let payload;try{payload=JSON.parse(raw)}catch{return send(res,400,{error:'invalid_json'})}
-  try{if(url.pathname.endsWith('supervision')){if(payload.experience&&payload.experience!=='corporate')throw Error('invalid_experience');return send(res,200,supervisionFor(payload.history,payload.experienceVersion));}return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history,payload.experience||'corporate',payload.experienceVersion||'1'):resolveStep({...payload,experienceVersion:payload.experienceVersion||'1'}))}catch{return send(res,400,{error:'invalid_step'})}
+  try{if(url.pathname.endsWith('supervision')){return send(res,200,supervisionFor(payload.history,payload.experienceVersion,payload.experience||'corporate',payload.scope||'all'));}return send(res,200,url.pathname.endsWith('resume')?resumeState(payload.history,payload.experience||'corporate',payload.experienceVersion||'1'):resolveStep({...payload,experienceVersion:payload.experienceVersion||'1'}))}catch{return send(res,400,{error:'invalid_step'})}
  }
  let file;
  if(['/','/experience','/coonto'].includes(url.pathname))file='index.html';
  else if(url.pathname==='/marina')file='marina.html';
+ else if(url.pathname==='/ana')file='ana.html';
  else if(url.pathname==='/supervisao')file='supervisao.html';
  else if(['/app.js','/materials.js','/styles.css','/marina.js','/marina.css','/supervisao.js'].includes(url.pathname))file=url.pathname.slice(1);
  else if(url.pathname==='/materiais/coonto-educacao-parcerias.pdf')file='materiais/coonto-educacao-parcerias.pdf';
