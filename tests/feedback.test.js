@@ -43,3 +43,8 @@ test('feedback HTTP validates input, refuses cross-origin submissions and expose
   const rows=(await readFile(path.join(directory,'experience-feedback.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);assert.equal(rows.length,2);assert.equal(rows[1].experience,'medical');
  }finally{server.closeAllConnections();await new Promise(r=>server.close(r));await rm(directory,{recursive:true,force:true})}
 });
+
+test('narrative feedback accepts only scenes from its own edition and excludes participant history',async()=>{
+ const directory=await mkdtemp(path.join(tmpdir(),'coonto-story-feedback-'));
+ try{const store=createFeedbackStore(directory),input={...payload(),experienceVersion:'3',phase:'portafechada',history:[{phase:'chegada',choice:'reservar'}]};await store.submit(input);const row=JSON.parse((await readFile(path.join(directory,'experience-feedback.jsonl'),'utf8')).trim());assert.equal(row.phase,'portafechada');assert.equal(row.history,undefined);await assert.rejects(store.submit({...input,phase:'entrada'}),/invalid_feedback/);await assert.rejects(store.submit({...input,experience:'medical'}),/invalid_feedback/);}finally{await rm(directory,{recursive:true,force:true})}
+});

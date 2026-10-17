@@ -30,7 +30,8 @@ const server=http.createServer(async(req,res)=>{try{
  }
  let file;
  if(['/','/experience','/coonto'].includes(url.pathname))file='index.html';
- else if(['/app.js','/materials.js','/styles.css'].includes(url.pathname))file=url.pathname.slice(1);
+ else if(url.pathname==='/marina')file='marina.html';
+ else if(['/app.js','/materials.js','/styles.css','/marina.js','/marina.css'].includes(url.pathname))file=url.pathname.slice(1);
  else if(url.pathname==='/materiais/coonto-educacao-parcerias.pdf')file='materiais/coonto-educacao-parcerias.pdf';
  else if(/^\/assets\/[a-z0-9-]+\.(svg|png|mp4|vtt)$/.test(url.pathname))file=url.pathname.slice(1);
  if(file&&['GET','HEAD'].includes(req.method)){

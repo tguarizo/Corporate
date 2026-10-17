@@ -204,4 +204,8 @@ async function selectExperience(id,requestedEdition='2'){
  try{await restoreSaved()}finally{setBusy(false);syncWelcomeActions()}
  el('welcomeTitle').tabIndex=-1;el('welcomeTitle').focus({preventScroll:true});
 }
-el('select-corporate').onclick=()=>selectExperience('corporate');el('select-medical').onclick=()=>selectExperience('medical');el('previousEdition').onclick=()=>selectExperience(selected,'1');
+el('select-corporate').onclick=()=>{location.href='/marina'};el('select-medical').onclick=()=>selectExperience('medical');el('previousEdition').onclick=()=>selectExperience(selected,'1');
+
+if(new URLSearchParams(location.search).get('edition')==='2')selectExperience('corporate','2');
+
+el('select-corporate-previous').onclick=()=>selectExperience('corporate','2');
