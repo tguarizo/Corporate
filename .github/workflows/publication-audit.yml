@@ -1,0 +1,124 @@
+name: Audit Alpha publication target
+on:
+  push:
+    branches: [codex/alpha-publication-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      summary: ${{ steps.remote.outputs.summary }}
+      fingerprint: ${{ steps.remote.outputs.fingerprint }}
+    steps:
+      - name: Verify configured SSH prerequisites
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'Missing SSH_PRIVATE_KEY'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'Missing SERVER_HOST'; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+      - name: Read VPS service and Caddy routing information
+        id: remote
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
+        run: |
+          set -euo pipefail
+          # Initial host key uses OpenSSH TOFU; changed host keys remain rejected.
+          audit_result="$(ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=accept-new "${SERVER_USER}@${SERVER_HOST}" bash -s <<'REMOTE'
+          set -euo pipefail
+          docker ps --format '{{.Names}} {{.Image}} {{.Ports}}'
+          docker inspect caddy_global --format '{{json .Mounts}}'
+          docker exec caddy_global caddy adapt --config /etc/caddy/Caddyfile 2>/dev/null | python3 -c '
+          import json,sys
+          from urllib.parse import urlsplit
+          data=json.load(sys.stdin)
+          targets={"tuuvo.app.br","tuuvo.com.br","dev.coonto.com"}
+          def visit(x):
+              if isinstance(x,dict):
+                  hosts=[]
+                  for m in x.get("match",[]):
+                      if isinstance(m,dict): hosts.extend(m.get("host",[]))
+                  if targets.intersection(hosts):
+                      dials=[]
+                      def collect(y):
+                          if isinstance(y,dict):
+                              if y.get("handler")=="reverse_proxy":
+                                  for u in y.get("upstreams",[]):
+                                      dial=u.get("dial","")
+                                      if "@" in dial: dial=dial.rsplit("@",1)[1]
+                                      dials.append(dial)
+                              for v in y.values(): collect(v)
+                          elif isinstance(y,list):
+                              for v in y: collect(v)
+                      collect(x.get("handle",[]))
+                      print(json.dumps({"hosts":hosts,"upstreams":dials}))
+                  for v in x.values(): visit(v)
+              elif isinstance(x,list):
+                  for v in x: visit(v)
+          visit(data)
+          print(json.dumps({"hosts":["admin-status"],"upstreams":["disabled" if data.get("admin",{}).get("disabled") else "enabled"]}))
+          '
+          docker inspect coonto-corporate-alpha --format '{"hosts":["alpha-status"],"upstreams":["{{.State.Status}}"]}' 2>/dev/null || true
+          python3 - <<'PYDIAG'
+          import subprocess,json
+          p=subprocess.run(['docker','inspect','coonto-corporate-alpha'],capture_output=True,text=True)
+          if p.returncode==0:
+              d=json.loads(p.stdout)[0]
+              connected='corporate_alpha_internal' in d['NetworkSettings']['Networks']
+              print(json.dumps({'hosts':['alpha-network'],'upstreams':['attached' if connected else 'absent']}))
+          p=subprocess.run(['docker','inspect','caddy_global'],capture_output=True,text=True)
+          if p.returncode==0:
+              d=json.loads(p.stdout)[0]
+              print(json.dumps({'hosts':['proxy-state'],'upstreams':[d['State']['Status']]}))
+              print(json.dumps({'hosts':['proxy-start-config'],'upstreams':['expected' if '/etc/caddy/Caddyfile' in d.get('Args',[]) else 'different']}))
+          p=subprocess.run(['sudo','-n','python3','-c','import os; assert os.geteuid()==0'],capture_output=True,text=True)
+          print(json.dumps({'hosts':['sudo-status'],'upstreams':['ready' if p.returncode==0 else 'unavailable']}))
+          p=subprocess.run(['pgrep','-f',r'(^|/)python3 /tmp/corporate-alpha-publish\.[^/]+/publish.py '],capture_output=True,text=True)
+          print(json.dumps({'hosts':['publisher-process'],'upstreams':['active' if p.returncode==0 else 'idle']}))
+          import urllib.request,urllib.error
+          for label,url in [('institutional-health','https://tuuvo.com.br/health'),('education-health','https://dev.coonto.com/api/health')]:
+              try:
+                  with urllib.request.urlopen(url,timeout=15) as response:status=response.status
+              except urllib.error.HTTPError as error:status=error.code
+              except Exception:status=0
+              print(json.dumps({'hosts':[label],'upstreams':['HTTP_'+str(status)]}))
+          PYDIAG
+          REMOTE
+          )"
+          printf "fingerprint=%s\n" "$(ssh-keygen -lf ~/.ssh/known_hosts | awk '{print $2}' | head -n1)" >> "$GITHUB_OUTPUT"
+          export AUDIT_RESULT="$audit_result"
+          python3 - <<'PYRESULT'
+          import os,json,re
+          parts=[]
+          for line in os.environ['AUDIT_RESULT'].splitlines():
+              try: item=json.loads(line)
+              except ValueError: continue
+              if not isinstance(item,dict) or 'hosts' not in item: continue
+              for host in item['hosts']:
+                  if host in ['tuuvo.app.br','tuuvo.com.br','dev.coonto.com','admin-status','alpha-status','alpha-network','proxy-state','proxy-start-config','sudo-status','institutional-health','education-health','publisher-process']:
+                      dials=','.join(item.get('upstreams',[])) or 'no reverse proxy'
+                      dials=re.sub(r'[^a-zA-Z0-9_.:, -]','',dials)[:80]
+                      parts.append(host+'='+dials)
+          if not parts: raise SystemExit('No target routing information obtained')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write('summary='+'; '.join(parts)+'\n')
+          PYRESULT
+  result:
+    needs: audit
+    name: "VPS routing: ${{ needs.audit.outputs.summary }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Read-only audit completed; services unchanged.'
+  host_identity:
+    needs: audit
+    name: "SSH host identity: ${{ needs.audit.outputs.fingerprint }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Recorded identity of the VPS used for the read-only routing audit.'

@@ -1,0 +1,125 @@
+name: Publish clean Corporate Alpha
+# Publish both narrative cases and explicitly fictional supervision comparisons; preserve unrelated routes.
+on:
+  push:
+    branches: [feature/jornada-multimidia]
+    paths:
+      - .github/workflows/publish-clean-alpha.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: corporate-alpha-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      result: ${{ steps.deploy.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate application before publication
+        run: npm test
+      - name: Verify SSH configuration and audited host identity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'Missing SSH_PRIVATE_KEY'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'Missing SERVER_HOST'; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 20 "$SERVER_HOST" > /tmp/host-keys 2>/dev/null
+          matched=0
+          while IFS= read -r key; do
+            printf '%s\n' "$key" > /tmp/one-host-key
+            fingerprint=$(ssh-keygen -lf /tmp/one-host-key | awk '{print $2}')
+            if [ "$fingerprint" = 'SHA256:krCrd5JK0ES+IzHRuIdHDMqrsoEUsh2UWKz0tJ9YZ0Y' ]; then
+              cat /tmp/one-host-key >> ~/.ssh/known_hosts
+              matched=1
+            fi
+          done < /tmp/host-keys
+          test "$matched" = 1 || { echo 'Audited VPS host identity mismatch'; exit 1; }
+      - name: Prepare the exact validated Alpha source
+        run: |
+          set -euo pipefail
+          git archive af331d0020ea425bb67c68c26573542def542143 > /tmp/alpha.tar
+          gzip /tmp/alpha.tar
+      - name: Publish Alpha with verified routing and rollback
+        id: deploy
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
+        run: |
+          set -euo pipefail
+          destination="${SERVER_USER}@${SERVER_HOST}"
+          remote_dir=$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" 'mktemp -d /tmp/corporate-alpha-publish.XXXXXX')
+          [[ "$remote_dir" =~ ^/tmp/corporate-alpha-publish\.[A-Za-z0-9]+$ ]]
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes /tmp/alpha.tar.gz "$destination:$remote_dir/source.tar.gz"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes .github/scripts/publish-alpha.py "$destination:$remote_dir/publish.py"
+          set +e
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$destination" "sudo -n python3 '$remote_dir/publish.py' '$remote_dir/source.tar.gz'" > /tmp/publication-result 2>&1
+          publication_status=$?
+          set -e
+          if [ "$publication_status" = 0 ]; then
+            result=OK
+          else
+            result=$(grep -E '^DEPLOY_CODE=E[0-9][0-9]$' /tmp/publication-result | tail -n 1 | cut -d= -f2 || true)
+            result="${result:-E99}"
+          fi
+          printf 'result=%s\n' "$result" >> "$GITHUB_OUTPUT"
+          cat /tmp/publication-result
+          exit "$publication_status"
+  report:
+    if: always()
+    needs: publish
+    name: "Alpha result: ${{ needs.publish.outputs.result }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Publication result recorded; inspect preceding job for status.'
+  browser:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public brochure download
+        run: |
+          python3 - <<'PY'
+          import urllib.request,hashlib,pathlib
+          expected=pathlib.Path('public/materiais/coonto-educacao-parcerias.pdf').read_bytes()
+          with urllib.request.urlopen('https://tuuvo.app.br/materiais/coonto-educacao-parcerias.pdf',timeout=60) as response:
+              assert response.status==200
+              assert response.headers.get_content_type()=='application/pdf'
+              assert response.headers.get('Content-Disposition')=='attachment; filename="Coonto-Educacao-Parcerias.pdf"'
+              actual=response.read()
+          assert actual.startswith(b'%PDF-')
+          assert hashlib.sha256(actual).digest()==hashlib.sha256(expected).digest()
+          print('PASS: public PDF downloads with the correct headers and matches the validated four-page document')
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --prefix /tmp/alpha-browser --no-audit --no-fund --ignore-scripts playwright@1.58.2
+      - name: Validate both published experiences
+        env:
+          NODE_PATH: /tmp/alpha-browser/node_modules
+        run: |
+          node .github/scripts/public-browser-smoke.cjs
+          node .github/scripts/medical-browser-smoke.cjs
+          node .github/scripts/marina-browser-smoke.cjs
+          node .github/scripts/supervision-browser-smoke.cjs
+          node .github/scripts/ana-narrative-browser-smoke.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: duas-experiencias-validadas
+          path: /tmp/alpha-browser/*.png
+          retention-days: 7

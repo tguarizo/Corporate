@@ -1,0 +1,87 @@
+name: Review Coonto audience feedback
+on:
+  push:
+    branches: [feature/jornada-multimidia]
+    paths: [.github/workflows/review-experience-feedback.yml]
+  workflow_dispatch:
+    inputs:
+      recipient_public_key:
+        description: 'RSA recipient public key, PEM encoded as base64; never a private key'
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  review:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify SSH configuration and audited host identity
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'Missing SSH_PRIVATE_KEY'; exit 1; }
+          test -n "$SERVER_HOST" || { echo 'Missing SERVER_HOST'; exit 1; }
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -T 20 "$SERVER_HOST" > /tmp/host-keys 2>/dev/null
+          matched=0
+          while IFS= read -r key; do
+            printf '%s\n' "$key" > /tmp/one-host-key
+            fingerprint=$(ssh-keygen -lf /tmp/one-host-key | awk '{print $2}')
+            if [ "$fingerprint" = 'SHA256:krCrd5JK0ES+IzHRuIdHDMqrsoEUsh2UWKz0tJ9YZ0Y' ]; then
+              cat /tmp/one-host-key >> ~/.ssh/known_hosts
+              matched=1
+            fi
+          done < /tmp/host-keys
+          test "$matched" = 1 || { echo 'Audited VPS host identity mismatch'; exit 1; }
+      - name: Export feedback through authenticated VPS access
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER || 'deploy' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p /tmp/coonto-feedback-review
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes "${SERVER_USER}@${SERVER_HOST}" 'sudo -n python3 -' > /tmp/coonto-feedback-review/feedback.json <<'PY'
+          import pathlib,json,datetime
+          file=pathlib.Path('/opt/coonto/corporate-alpha/feedback/experience-feedback.jsonl')
+          records=[]
+          if file.exists():
+              assert file.stat().st_size<=11*1024*1024
+              for line in file.read_text().splitlines():
+                  try:record=json.loads(line)
+                  except ValueError:continue
+                  records.append(record)
+          print(json.dumps({'generatedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'feedback':records},ensure_ascii=False,indent=2))
+          PY
+          python3 - <<'PY'
+          import json,collections
+          data=json.load(open('/tmp/coonto-feedback-review/feedback.json'))
+          groups=collections.Counter(x['category'] for x in data['feedback'])
+          print('::notice title=Coonto audience feedback::'+str(len(data['feedback']))+' comment(s); categories: '+json.dumps(groups)+'; comment text is encrypted for the recipient and is not included in logs.')
+          PY
+      - name: Encrypt the export for the review recipient
+        env:
+          RECIPIENT_PUBLIC_KEY: ${{ inputs.recipient_public_key }}
+        run: |
+          node - <<'JS'
+          const fs=require('node:fs');
+          const {encryptFeedback}=require('./.github/scripts/feedback-archive.cjs');
+          const file='/tmp/coonto-feedback-review/feedback.json';
+          const publicKey=Buffer.from(process.env.RECIPIENT_PUBLIC_KEY,'base64');
+          const archive=Buffer.from(JSON.stringify(encryptFeedback(fs.readFileSync(file),publicKey)));
+          fs.writeFileSync('/tmp/coonto-feedback-review/feedback.encrypted.json',archive,{mode:0o600});
+          fs.unlinkSync(file);
+          if(archive.length<=24000)console.log('::notice title=Encrypted Coonto feedback::'+archive.toString('base64'));
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coonto-audience-feedback-encrypted
+          path: /tmp/coonto-feedback-review/feedback.encrypted.json
+          retention-days: 7
