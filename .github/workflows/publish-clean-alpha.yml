@@ -1,5 +1,5 @@
 name: Publish clean Corporate Alpha
-# Preserve existing routes and audience feedback while publishing the branching Marina story.
+# Preserve routes and audience feedback while publishing supervision and the new Marina challenge.
 on:
   push:
     branches: [feature/jornada-multimidia]
@@ -51,7 +51,7 @@ jobs:
       - name: Prepare the exact validated Alpha source
         run: |
           set -euo pipefail
-          git archive a148d9574707a5174081148681269fbd4a2114a2 > /tmp/alpha.tar
+          git archive dad55b7476721af54e1dcbd3675c704e91a9ad47 > /tmp/alpha.tar
           gzip /tmp/alpha.tar
       - name: Publish Alpha with verified routing and rollback
         id: deploy
@@ -116,6 +116,7 @@ jobs:
           node .github/scripts/public-browser-smoke.cjs
           node .github/scripts/medical-browser-smoke.cjs
           node .github/scripts/marina-browser-smoke.cjs
+          node .github/scripts/supervision-browser-smoke.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: duas-experiencias-validadas
