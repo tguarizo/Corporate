@@ -1,5 +1,5 @@
 import os,sys,json,re,subprocess,tempfile,pathlib,time,urllib.request,hashlib,tarfile,shutil
-SHA='903aeaa18fbab432edfd4717882d0972b31015db'
+SHA='a148d9574707a5174081148681269fbd4a2114a2'
 APP='coonto-corporate-alpha'
 NETWORK='corporate_alpha_internal'
 TARGET='tuuvo.app.br'
@@ -172,7 +172,7 @@ try:
     run('docker','run','-d','--restart','unless-stopped','--name',APP,'--network',NETWORK,'--mount','type=bind,source='+str(feedback)+',target=/app/data/feedback','--env','FEEDBACK_DIR=/app/data/feedback',image)
     started=True
     STAGE='E10'
-    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.11')throw Error('wrong service')}).catch(()=>process.exit(1))"
+    health_script="fetch('http://127.0.0.1:3000/api/health').then(async r=>{if(!r.ok)throw Error('HTTP');let d=await r.json();if(d.service!=='coonto-corporate'||d.version!=='0.1.0-alpha.12')throw Error('wrong service')}).catch(()=>process.exit(1))"
     for attempt in range(20):
         p=subprocess.run(['docker','exec',APP,'node','-e',health_script],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if p.returncode==0:break
@@ -191,7 +191,7 @@ try:
             with urllib.request.urlopen('https://'+TARGET+'/api/health',timeout=10) as r:
                 if r.status!=200:raise RuntimeError('Public HTTP health failed')
                 d=json.load(r)
-                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.11':raise RuntimeError('Public host returned wrong service')
+                if d.get('service')!='coonto-corporate' or d.get('version')!='0.1.0-alpha.12':raise RuntimeError('Public host returned wrong service')
             break
         except Exception:
             if attempt==19:raise
@@ -199,7 +199,7 @@ try:
     STAGE='E14'
     with urllib.request.urlopen('https://'+TARGET+'/experience',timeout=20) as r:
         if r.status!=200 or b'<!doctype html>' not in r.read(100000).lower():raise RuntimeError('Public experience failed')
-    print('PUBLISHED: Alpha 0.1.0-alpha.11; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
+    print('PUBLISHED: Alpha 0.1.0-alpha.12; Corporate host verified; unrelated Caddy handlers preserved; backup retained')
 except BaseException:
     failure_stage=STAGE
     STAGE='E15'

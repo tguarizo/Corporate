@@ -1,5 +1,5 @@
 name: Publish clean Corporate Alpha
-# Preserve existing static and app routes while publishing the validated focused journey.
+# Preserve existing routes and audience feedback while publishing the branching Marina story.
 on:
   push:
     branches: [feature/jornada-multimidia]
@@ -51,7 +51,7 @@ jobs:
       - name: Prepare the exact validated Alpha source
         run: |
           set -euo pipefail
-          git archive 903aeaa18fbab432edfd4717882d0972b31015db > /tmp/alpha.tar
+          git archive a148d9574707a5174081148681269fbd4a2114a2 > /tmp/alpha.tar
           gzip /tmp/alpha.tar
       - name: Publish Alpha with verified routing and rollback
         id: deploy
@@ -88,7 +88,7 @@ jobs:
   browser:
     needs: publish
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - name: Verify public brochure download
@@ -115,6 +115,7 @@ jobs:
         run: |
           node .github/scripts/public-browser-smoke.cjs
           node .github/scripts/medical-browser-smoke.cjs
+          node .github/scripts/marina-browser-smoke.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: duas-experiencias-validadas
